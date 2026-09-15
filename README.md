@@ -129,6 +129,4 @@ Then in `server/.env`:
 DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/dashboard"
 ```
 
-This only exists on your machine, though — your friend would need her own local
-setup with the same steps, and it won't work once you deploy. Neon (section 1)
-avoids both problems.
+
