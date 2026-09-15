@@ -1,5 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { Bell, Search, User, LogOut } from "lucide-react";
+import {
+  Search,
+  Bell,
+  CircleHelp,
+  Settings,
+  User,
+  LogOut,
+} from "lucide-react";
 import { getUser, clearSession } from "../lib/auth.js";
 
 export default function Header() {
@@ -12,45 +19,208 @@ export default function Header() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-dark/10 bg-white px-6 py-4 md:px-8">
-      <div className="flex w-full max-w-sm items-center gap-2 rounded-full border border-dark/15 px-4 py-2">
-        <Search size={16} className="text-dark/40" />
-        <input
-          type="text"
-          placeholder="Search"
-          className="w-full bg-transparent text-sm text-dark outline-none placeholder:text-dark/40"
-        />
-      </div>
+    <header
+      style={{
+        width: "100%",
+        padding: "32px 30px 0 30px",
+        background: "#F7F5E9",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: "22px",
+        }}
+      >
+        {/* ================= SEARCH ================= */}
 
-      <div className="flex items-center gap-4">
-        <button
-          aria-label="Notifications"
-          className="relative rounded-full p-2 text-dark/60 hover:bg-dark/5 hover:text-dark"
+        <div
+          style={{
+            flex: 1,
+            height: "40px",
+            maxWidth: "810px",
+            border: "1px solid rgba(0,55,58,0.22)",
+            borderRadius: "24px",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 10px",
+            boxSizing: "border-box",
+            background: "#F7F5E9",
+          }}
         >
-          <Bell size={20} />
-          <span
-            className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full"
-            style={{ backgroundColor: "#FF6A3D" }}
+          <Search
+            size={25}
+            strokeWidth={2}
+            color="rgba(0,55,58,0.25)"
           />
-        </button>
 
-        <div className="flex items-center gap-2 rounded-full border border-dark/15 py-1 pl-1 pr-2">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-full text-white"
-            style={{ backgroundColor: "#7C3AED" }}
-          >
-            <User size={16} />
-          </div>
-          <span className="text-sm text-dark" style={{ fontWeight: 600 }}>
-            {user?.name || "Account"}
-          </span>
+          <input
+            type="text"
+            placeholder="Search across leads, accounts, and tasks..."
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              padding: "0 8px",
+              fontSize: "12px",
+              color: "#00373A",
+              fontFamily: "Gellix, sans-serif",
+            }}
+          />
+        </div>
+
+
+        {/* ================= RIGHT ICONS ================= */}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "24px",
+            marginLeft: "auto",
+          }}
+        >
+
+          {/* NOTIFICATION */}
+
           <button
-            onClick={handleLogout}
-            aria-label="Log out"
-            className="ml-1 rounded-full p-1.5 text-dark/40 hover:bg-dark/5 hover:text-dark"
+            type="button"
+            aria-label="Notifications"
+            style={{
+              position: "relative",
+              width: "24px",
+              height: "24px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
           >
-            <LogOut size={16} />
+            <Bell
+              size={22}
+              strokeWidth={1.8}
+              color="rgba(0,55,58,0.28)"
+            />
+
+            <span
+              style={{
+                position: "absolute",
+                top: "1px",
+                right: "0px",
+                width: "5px",
+                height: "5px",
+                borderRadius: "50%",
+                background: "#E00000",
+              }}
+            />
           </button>
+
+
+          {/* HELP */}
+
+          <button
+            type="button"
+            aria-label="Help"
+            style={{
+              width: "24px",
+              height: "24px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <CircleHelp
+              size={22}
+              strokeWidth={1.8}
+              color="rgba(0,55,58,0.28)"
+            />
+          </button>
+
+
+          {/* SETTINGS */}
+
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={() => navigate("/settings")}
+            style={{
+              width: "24px",
+              height: "24px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <Settings
+              size={23}
+              strokeWidth={1.8}
+              color="rgba(0,55,58,0.28)"
+            />
+          </button>
+
+
+          {/* ================= PROFILE ================= */}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginLeft: "2px",
+            }}
+          >
+
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "50%",
+                border: "1px solid rgba(0,55,58,0.25)",
+                background:
+                  "linear-gradient(135deg, #d8b08c, #76513d)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                color: "#FFFFFF",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
+              {user?.name
+                ? user.name.charAt(0).toUpperCase()
+                : "I"}
+            </div>
+
+            <span
+              style={{
+                fontSize: "13px",
+                lineHeight: "18px",
+                color: "#202020",
+                fontWeight: 600,
+              }}
+            >
+              {user?.name || "Isha"}
+            </span>
+
+          </div>
+
         </div>
       </div>
     </header>

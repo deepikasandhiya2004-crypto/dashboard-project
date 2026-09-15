@@ -4,13 +4,48 @@ import Header from "../components/Header.jsx";
 
 export default function DashboardLayout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-cream">
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        overflow: "hidden",
+        background: "#F7F5E9",
+      }}
+    >
+      {/* SIDEBAR */}
+
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+
+      {/* MAIN AREA */}
+
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          background: "#F7F5E9",
+        }}
+      >
+
+        {/* TOP NAVBAR */}
+
         <Header />
-        <main className="flex-1 overflow-y-auto px-6 py-6 md:px-8">
+
+        {/* PAGE CONTENT */}
+
+        <main
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "34px 30px 30px 30px",
+            boxSizing: "border-box",
+          }}
+        >
           <Outlet />
         </main>
+
       </div>
     </div>
   );
