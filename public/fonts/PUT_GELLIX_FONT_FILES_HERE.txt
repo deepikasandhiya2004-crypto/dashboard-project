@@ -1,0 +1,10 @@
+Put your licensed Gellix font files here as:
+
+  Gellix-Regular.woff2
+  Gellix-Medium.woff2
+  Gellix-SemiBold.woff2
+  Gellix-Bold.woff2
+  Gellix-ExtraBold.woff2
+
+(see src/index.css). Until you add them, the site uses the system font
+automatically — nothing breaks.

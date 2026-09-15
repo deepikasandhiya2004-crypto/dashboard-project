@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("member") // admin | member
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  client    String?
+  status    String   @default("planning") // planning | active | completed
+  progress  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  title     String
+  assignee  String?
+  priority  String   @default("medium") // low | medium | high
+  status    String   @default("todo") // todo | in_progress | done
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+}
