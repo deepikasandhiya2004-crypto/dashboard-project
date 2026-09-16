@@ -18,6 +18,11 @@ import Support from "./pages/Support.jsx";
 import Reports from "./pages/Reports.jsx";
 import Settings from "./pages/Settings.jsx";
 import Proposals from "./pages/Proposals.jsx";
+import Invoice from "./pages/invoice.jsx";
+import Payments from "./pages/payments.jsx";
+import Transactions from "./pages/transactions.jsx";
+
+
 
 export default function App() {
   return (
@@ -46,6 +51,13 @@ export default function App() {
         <Route path="/marketing" element={<Marketing />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/finance" element={<Finance />} />
+        <Route path="/finance/invoices" element={<Invoice />} />
+       <Route path="/finance/payments" element={<Payments />} />
+       <Route
+  path="/finance/transactions"
+  element={<Transactions />}
+/>
+<Route path="/support" element={<Support />} />
         <Route path="/support" element={<Support />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />

@@ -215,15 +215,20 @@ model Lead {
 }
 
 model Client {
-  id         String     @id @default(cuid())
-  name       String
-  email      String?
-  phone      String?
-  company    String?
-  deals      Deal[]
-  proposals  Proposal[]
-  activities Activity[]
-  createdAt  DateTime   @default(now())
+  id           String        @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  deals        Deal[]
+  proposals    Proposal[]
+  activities   Activity[]
+  quotations   Quotation[]
+  invoices     Invoice[]
+  payments     Payment[]
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  supportTickets SupportTicket[]
 }
 
 model Deal {
@@ -253,7 +258,7 @@ model Proposal {
 
 model Activity {
   id        String   @id @default(cuid())
-  type      String   // call | email | meeting | note
+  type      String // call | email | meeting | note
   subject   String
   notes     String?
   leadId    String?
@@ -263,4 +268,122 @@ model Activity {
   dealId    String?
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+// Module 10: Finance Models
+
+model Quotation {
+  id          String          @id @default(cuid())
+  quotationNo String          @unique
+  clientId    String
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  issueDate   DateTime        @default(now())
+  validUntil  DateTime?
+  status      String          @default("draft") // draft | sent | accepted | rejected | expired
+  subtotal    Float           @default(0)
+  discount    Float           @default(0)
+  tax         Float           @default(0)
+  total       Float           @default(0)
+  notes       String?
+  items       QuotationItem[]
+  invoice     Invoice?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int       @default(1)
+  unitPrice   Float     @default(0)
+  total       Float     @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNo     String        @unique
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quotationId   String?       @unique
+  quotation     Quotation?    @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime?
+  status        String        @default("draft") // draft | sent | unpaid | partially_paid | paid | overdue | cancelled
+  subtotal      Float         @default(0)
+  discount      Float         @default(0)
+  tax           Float         @default(0)
+  total         Float         @default(0)
+  paidAmount    Float         @default(0)
+  balanceAmount Float         @default(0)
+  notes         String?
+  items         InvoiceItem[]
+  payments      Payment[]
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Float    @default(0)
+  total       Float    @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  paymentNo   String   @unique
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Float
+  paymentDate DateTime @default(now())
+  method      String   @default("bank_transfer") // cash | bank_transfer | upi | card | cheque | other
+  reference   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  transactionNo   String   @unique
+  clientId        String?
+  client          Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  invoiceId       String?
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  type            String // income | expense
+  category        String
+  amount          Float
+  description     String?
+  transactionDate DateTime @default(now())
+  reference       String?
+  createdAt       DateTime @default(now())
+}
+// =====================================================
+// SUPPORT TICKETS
+// =====================================================
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  ticketNo    String   @unique
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  subject     String
+  description String?
+  status      String   @default("open")
+  priority    String   @default("medium")
+  category    String   @default("general")
+  assignedTo  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

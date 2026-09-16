@@ -139,4 +139,81 @@ export const api = {
   deleteFollowup: (id) => apiClient.delete(`/api/calendar/followups/${id}`),
 
   getCalendarEvents: () => apiClient.get("/api/calendar/events"),
+
+    // Module 10: Finance — Quotations
+  getQuotations: () => apiClient.get("/api/quotations"),
+  getQuotation: (id) => apiClient.get(`/api/quotations/${id}`),
+  createQuotation: (data) => apiClient.post("/api/quotations", data),
+  updateQuotation: (id, data) => apiClient.patch(`/api/quotations/${id}`, data),
+  deleteQuotation: (id) => apiClient.delete(`/api/quotations/${id}`),
+ // =====================================================
+// INVOICE APIs
+// =====================================================
+
+getInvoices: () =>
+  apiClient.get("/api/invoices"),
+
+getInvoice: (id) =>
+  apiClient.get(`/api/invoices/${id}`),
+
+createInvoice: (data) =>
+  apiClient.post("/api/invoices", data),
+
+updateInvoice: (id, data) =>
+  apiClient.patch(`/api/invoices/${id}`, data),
+
+deleteInvoice: (id) =>
+  apiClient.delete(`/api/invoices/${id}`),
+
+// =====================================================
+// PAYMENT APIs
+// =====================================================
+
+getPayments: () =>
+  apiClient.get("/api/payments"),
+
+getPayment: (id) =>
+  apiClient.get(`/api/payments/${id}`),
+
+createPayment: (data) =>
+  apiClient.post("/api/payments", data),
+
+deletePayment: (id) =>
+  apiClient.delete(`/api/payments/${id}`),
+// =====================================================
+// TRANSACTION APIs
+// =====================================================
+
+getTransactions: () =>
+  apiClient.get("/api/transactions"),
+
+getTransaction: (id) =>
+  apiClient.get(`/api/transactions/${id}`),
+
+createTransaction: (data) =>
+  apiClient.post("/api/transactions", data),
+
+updateTransaction: (id, data) =>
+  apiClient.patch(`/api/transactions/${id}`, data),
+
+deleteTransaction: (id) =>
+  apiClient.delete(`/api/transactions/${id}`),
+// =====================================================
+// SUPPORT TICKET APIs
+// =====================================================
+
+getSupportTickets: () =>
+  apiClient.get("/api/support-tickets"),
+
+getSupportTicket: (id) =>
+  apiClient.get(`/api/support-tickets/${id}`),
+
+createSupportTicket: (data) =>
+  apiClient.post("/api/support-tickets", data),
+
+updateSupportTicket: (id, data) =>
+  apiClient.patch(`/api/support-tickets/${id}`, data),
+
+deleteSupportTicket: (id) =>
+  apiClient.delete(`/api/support-tickets/${id}`),
 };

@@ -1364,6 +1364,1479 @@ app.get("/api/calendar/events", async (req, res) => {
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+app.get("/api/quotations", async (req, res) => {
+  try {
+    const quotations = await prisma.quotation.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        client: true,
+        items: true,
+        invoice: true,
+      },
+    });
+
+    res.json(quotations);
+  } catch (err) {
+    console.error("Get quotations error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load quotations.",
+    });
+  }
+});
+
+
+
+// =========================================================
+// MODULE 10 — FINANCE (QUOTATIONS)
+// =========================================================
+
+app.use("/api/quotations", requireAuth);
+
+// GET ALL QUOTATIONS
+app.get("/api/quotations", async (req, res) => {
+  try {
+    const quotations = await prisma.quotation.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        client: true,
+        items: true,
+        invoice: true,
+      },
+    });
+
+    res.json(quotations);
+  } catch (err) {
+    console.error("Get quotations error:", err);
+    res.status(500).json({
+      error: err.message || "Failed to load quotations.",
+    });
+  }
+});
+
+// CREATE QUOTATION
+app.post("/api/quotations", async (req, res) => {
+  try {
+    const {
+      clientId,
+      issueDate,
+      validUntil,
+      status,
+      discount,
+      tax,
+      notes,
+      items,
+    } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId is required.",
+      });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: "At least one quotation item is required.",
+      });
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+    });
+
+    if (!client) {
+      return res.status(400).json({
+        error: "Client not found.",
+      });
+    }
+
+    const preparedItems = items
+      .filter(
+        (item) =>
+          String(item.description || "").trim() &&
+          Number(item.quantity) > 0 &&
+          Number(item.unitPrice) >= 0
+      )
+      .map((item) => {
+        const quantity = Number(item.quantity);
+        const unitPrice = Number(item.unitPrice);
+
+        return {
+          description: String(item.description).trim(),
+          quantity,
+          unitPrice,
+          total: quantity * unitPrice,
+        };
+      });
+
+    if (preparedItems.length === 0) {
+      return res.status(400).json({
+        error: "At least one valid quotation item is required.",
+      });
+    }
+
+    const subtotal = preparedItems.reduce(
+      (sum, item) => sum + item.total,
+      0
+    );
+
+    const discountAmount = Number(discount) || 0;
+    const taxAmount = Number(tax) || 0;
+
+    const total = Math.max(
+      0,
+      subtotal - discountAmount + taxAmount
+    );
+
+    const quotationNo = `QT-${Date.now()}`;
+
+    const quotation = await prisma.quotation.create({
+      data: {
+        quotationNo,
+        clientId,
+
+        issueDate: issueDate
+          ? new Date(issueDate)
+          : new Date(),
+
+        validUntil: validUntil
+          ? new Date(validUntil)
+          : null,
+
+        status: status || "draft",
+
+        subtotal,
+        discount: discountAmount,
+        tax: taxAmount,
+        total,
+
+        notes: notes || null,
+
+        items: {
+          create: preparedItems,
+        },
+      },
+
+      include: {
+        client: true,
+        items: true,
+        invoice: true,
+      },
+    });
+
+    res.status(201).json(quotation);
+  } catch (err) {
+    console.error("Create quotation error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create quotation.",
+    });
+  }
+});
+
+// GET SINGLE QUOTATION
+app.get("/api/quotations/:id", async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        client: true,
+        items: true,
+        invoice: true,
+      },
+    });
+
+    if (!quotation) {
+      return res.status(404).json({
+        error: "Quotation not found.",
+      });
+    }
+
+    res.json(quotation);
+  } catch (err) {
+    console.error("Get quotation error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load quotation.",
+    });
+  }
+});
+
+// UPDATE QUOTATION
+app.patch("/api/quotations/:id", async (req, res) => {
+  try {
+    const {
+      status,
+      validUntil,
+      discount,
+      tax,
+      notes,
+      items,
+    } = req.body;
+
+    const quotation = await prisma.quotation.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!quotation) {
+      return res.status(404).json({
+        error: "Quotation not found.",
+      });
+    }
+
+    let preparedItems = quotation.items;
+
+    if (Array.isArray(items) && items.length > 0) {
+      preparedItems = items
+        .filter(
+          (item) =>
+            String(item.description || "").trim() &&
+            Number(item.quantity) > 0 &&
+            Number(item.unitPrice) >= 0
+        )
+        .map((item) => {
+          const quantity = Number(item.quantity);
+          const unitPrice = Number(item.unitPrice);
+
+          return {
+            description: String(item.description).trim(),
+            quantity,
+            unitPrice,
+            total: quantity * unitPrice,
+          };
+        });
+
+      if (preparedItems.length === 0) {
+        return res.status(400).json({
+          error: "At least one valid quotation item is required.",
+        });
+      }
+    }
+
+    const subtotal = preparedItems.reduce(
+      (sum, item) => sum + Number(item.total || 0),
+      0
+    );
+
+    const discountAmount =
+      Number(discount ?? quotation.discount) || 0;
+
+    const taxAmount =
+      Number(tax ?? quotation.tax) || 0;
+
+    const total = Math.max(
+      0,
+      subtotal - discountAmount + taxAmount
+    );
+
+    const updatedQuotation = await prisma.$transaction(
+      async (tx) => {
+        if (Array.isArray(items)) {
+          await tx.quotationItem.deleteMany({
+            where: {
+              quotationId: quotation.id,
+            },
+          });
+        }
+
+        return tx.quotation.update({
+          where: {
+            id: quotation.id,
+          },
+
+          data: {
+            ...(status !== undefined && {
+              status,
+            }),
+
+            ...(validUntil !== undefined && {
+              validUntil: validUntil
+                ? new Date(validUntil)
+                : null,
+            }),
+
+            subtotal,
+            discount: discountAmount,
+            tax: taxAmount,
+            total,
+
+            ...(notes !== undefined && {
+              notes,
+            }),
+
+            ...(Array.isArray(items) && {
+              items: {
+                create: preparedItems,
+              },
+            }),
+          },
+
+          include: {
+            client: true,
+            items: true,
+            invoice: true,
+          },
+        });
+      }
+    );
+
+    res.json(updatedQuotation);
+  } catch (err) {
+    console.error("Update quotation error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update quotation.",
+    });
+  }
+});
+
+// DELETE QUOTATION
+app.delete("/api/quotations/:id", async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!quotation) {
+      return res.status(404).json({
+        error: "Quotation not found.",
+      });
+    }
+
+    await prisma.quotation.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Quotation deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete quotation error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete quotation.",
+    });
+  }
+});
+// =========================================================
+// MODULE 11 — FINANCE (INVOICES)
+// =========================================================
+
+app.use("/api/invoices", requireAuth);
+
+// GET ALL INVOICES
+app.get("/api/invoices", async (req, res) => {
+  try {
+    const invoices = await prisma.invoice.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        client: true,
+        quotation: true,
+        items: true,
+        payments: true,
+        transactions: true,
+      },
+    });
+
+    res.json(invoices);
+  } catch (err) {
+    console.error("Get invoices error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load invoices.",
+    });
+  }
+});
+
+// CREATE INVOICE
+app.post("/api/invoices", async (req, res) => {
+  try {
+    const {
+      clientId,
+      quotationId,
+      issueDate,
+      dueDate,
+      status,
+      discount,
+      tax,
+      notes,
+      items,
+    } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId is required.",
+      });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: "At least one invoice item is required.",
+      });
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+    });
+
+    if (!client) {
+      return res.status(400).json({
+        error: "Client not found.",
+      });
+    }
+
+    const preparedItems = items
+      .filter(
+        (item) =>
+          String(item.description || "").trim() &&
+          Number(item.quantity) > 0 &&
+          Number(item.unitPrice) >= 0
+      )
+      .map((item) => {
+        const quantity = Number(item.quantity);
+        const unitPrice = Number(item.unitPrice);
+
+        return {
+          description: String(item.description).trim(),
+          quantity,
+          unitPrice,
+          total: quantity * unitPrice,
+        };
+      });
+
+    if (preparedItems.length === 0) {
+      return res.status(400).json({
+        error: "At least one valid invoice item is required.",
+      });
+    }
+
+    const subtotal = preparedItems.reduce(
+      (sum, item) => sum + item.total,
+      0
+    );
+
+    const discountAmount = Number(discount) || 0;
+    const taxAmount = Number(tax) || 0;
+
+    const total = Math.max(
+      0,
+      subtotal - discountAmount + taxAmount
+    );
+
+    const invoiceNo = `INV-${Date.now()}`;
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNo,
+        clientId,
+
+        quotationId: quotationId || null,
+
+        issueDate: issueDate
+          ? new Date(issueDate)
+          : new Date(),
+
+        dueDate: dueDate
+          ? new Date(dueDate)
+          : null,
+
+        status: status || "draft",
+
+        subtotal,
+        discount: discountAmount,
+        tax: taxAmount,
+
+        total,
+
+        paidAmount: 0,
+        balanceAmount: total,
+
+        notes: notes || null,
+
+        items: {
+          create: preparedItems,
+        },
+      },
+
+      include: {
+        client: true,
+        quotation: true,
+        items: true,
+        payments: true,
+        transactions: true,
+      },
+    });
+
+    res.status(201).json(invoice);
+  } catch (err) {
+    console.error("Create invoice error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create invoice.",
+    });
+  }
+});
+
+// GET SINGLE INVOICE
+app.get("/api/invoices/:id", async (req, res) => {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: {
+        id: req.params.id,
+      },
+
+      include: {
+        client: true,
+        quotation: true,
+        items: true,
+        payments: true,
+        transactions: true,
+      },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        error: "Invoice not found.",
+      });
+    }
+
+    res.json(invoice);
+  } catch (err) {
+    console.error("Get invoice error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load invoice.",
+    });
+  }
+});
+
+// UPDATE INVOICE
+app.patch("/api/invoices/:id", async (req, res) => {
+  try {
+    const {
+      status,
+      dueDate,
+      discount,
+      tax,
+      notes,
+      items,
+    } = req.body;
+
+    const invoice = await prisma.invoice.findUnique({
+      where: {
+        id: req.params.id,
+      },
+
+      include: {
+        items: true,
+      },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        error: "Invoice not found.",
+      });
+    }
+
+    let preparedItems = invoice.items;
+
+    if (Array.isArray(items) && items.length > 0) {
+      preparedItems = items
+        .filter(
+          (item) =>
+            String(item.description || "").trim() &&
+            Number(item.quantity) > 0 &&
+            Number(item.unitPrice) >= 0
+        )
+        .map((item) => {
+          const quantity = Number(item.quantity);
+          const unitPrice = Number(item.unitPrice);
+
+          return {
+            description: String(item.description).trim(),
+            quantity,
+            unitPrice,
+            total: quantity * unitPrice,
+          };
+        });
+
+      if (preparedItems.length === 0) {
+        return res.status(400).json({
+          error: "At least one valid invoice item is required.",
+        });
+      }
+    }
+
+    const subtotal = preparedItems.reduce(
+      (sum, item) => sum + Number(item.total || 0),
+      0
+    );
+
+    const discountAmount =
+      Number(discount ?? invoice.discount) || 0;
+
+    const taxAmount =
+      Number(tax ?? invoice.tax) || 0;
+
+    const total = Math.max(
+      0,
+      subtotal - discountAmount + taxAmount
+    );
+
+    const paidAmount = Number(invoice.paidAmount) || 0;
+
+    const balanceAmount = Math.max(
+      0,
+      total - paidAmount
+    );
+
+    const updatedInvoice = await prisma.$transaction(
+      async (tx) => {
+        if (Array.isArray(items)) {
+          await tx.invoiceItem.deleteMany({
+            where: {
+              invoiceId: invoice.id,
+            },
+          });
+        }
+
+        return tx.invoice.update({
+          where: {
+            id: invoice.id,
+          },
+
+          data: {
+            ...(status !== undefined && {
+              status,
+            }),
+
+            ...(dueDate !== undefined && {
+              dueDate: dueDate
+                ? new Date(dueDate)
+                : null,
+            }),
+
+            subtotal,
+            discount: discountAmount,
+            tax: taxAmount,
+            total,
+            balanceAmount,
+
+            ...(notes !== undefined && {
+              notes,
+            }),
+
+            ...(Array.isArray(items) && {
+              items: {
+                create: preparedItems,
+              },
+            }),
+          },
+
+          include: {
+            client: true,
+            quotation: true,
+            items: true,
+            payments: true,
+            transactions: true,
+          },
+        });
+      }
+    );
+
+    res.json(updatedInvoice);
+  } catch (err) {
+    console.error("Update invoice error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update invoice.",
+    });
+  }
+});
+
+// DELETE INVOICE
+app.delete("/api/invoices/:id", async (req, res) => {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        error: "Invoice not found.",
+      });
+    }
+
+    await prisma.invoice.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Invoice deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete invoice error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete invoice.",
+    });
+  }
+});
+// =========================================================
+// MODULE 12 — FINANCE (PAYMENTS)
+// =========================================================
+
+app.use("/api/payments", requireAuth);
+
+// GET ALL PAYMENTS
+app.get("/api/payments", async (req, res) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      orderBy: { paymentDate: "desc" },
+      include: {
+        client: true,
+        invoice: true,
+      },
+    });
+
+    res.json(payments);
+  } catch (err) {
+    console.error("Get payments error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load payments.",
+    });
+  }
+});
+
+// CREATE PAYMENT
+app.post("/api/payments", async (req, res) => {
+  try {
+    const {
+      clientId,
+      invoiceId,
+      amount,
+      paymentDate,
+      method,
+      reference,
+      notes,
+    } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId is required.",
+      });
+    }
+
+    if (!invoiceId) {
+      return res.status(400).json({
+        error: "invoiceId is required.",
+      });
+    }
+
+    const paymentAmount = Number(amount);
+
+    if (!paymentAmount || paymentAmount <= 0) {
+      return res.status(400).json({
+        error: "Payment amount must be greater than 0.",
+      });
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: {
+        id: invoiceId,
+      },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        error: "Invoice not found.",
+      });
+    }
+
+    const currentPaidAmount = Number(invoice.paidAmount) || 0;
+    const invoiceTotal = Number(invoice.total) || 0;
+    const currentBalance = Math.max(
+      0,
+      invoiceTotal - currentPaidAmount
+    );
+
+    if (paymentAmount > currentBalance) {
+      return res.status(400).json({
+        error: `Payment cannot exceed the remaining balance of ${currentBalance}.`,
+      });
+    }
+
+    const newPaidAmount = currentPaidAmount + paymentAmount;
+    const newBalanceAmount = Math.max(
+      0,
+      invoiceTotal - newPaidAmount
+    );
+
+    let invoiceStatus = "partially_paid";
+
+    if (newBalanceAmount === 0) {
+      invoiceStatus = "paid";
+    }
+
+    const paymentNo = `PAY-${Date.now()}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          paymentNo,
+          clientId,
+          invoiceId,
+          amount: paymentAmount,
+          paymentDate: paymentDate
+            ? new Date(paymentDate)
+            : new Date(),
+          method: method || "bank_transfer",
+          reference: reference || null,
+          notes: notes || null,
+        },
+        include: {
+          client: true,
+          invoice: true,
+        },
+      });
+
+      const updatedInvoice = await tx.invoice.update({
+        where: {
+          id: invoiceId,
+        },
+        data: {
+          paidAmount: newPaidAmount,
+          balanceAmount: newBalanceAmount,
+          status: invoiceStatus,
+        },
+      });
+
+      return {
+        payment,
+        invoice: updatedInvoice,
+      };
+    });
+
+    res.status(201).json(result);
+  } catch (err) {
+    console.error("Create payment error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create payment.",
+    });
+  }
+});
+
+// GET SINGLE PAYMENT
+app.get("/api/payments/:id", async (req, res) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        client: true,
+        invoice: true,
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        error: "Payment not found.",
+      });
+    }
+
+    res.json(payment);
+  } catch (err) {
+    console.error("Get payment error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load payment.",
+    });
+  }
+});
+
+// DELETE PAYMENT
+app.delete("/api/payments/:id", async (req, res) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        error: "Payment not found.",
+      });
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: {
+        id: payment.invoiceId,
+      },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.delete({
+        where: {
+          id: payment.id,
+        },
+      });
+
+      if (invoice) {
+        const newPaidAmount = Math.max(
+          0,
+          Number(invoice.paidAmount) - Number(payment.amount)
+        );
+
+        const newBalanceAmount = Math.max(
+          0,
+          Number(invoice.total) - newPaidAmount
+        );
+
+        let invoiceStatus = "sent";
+
+        if (newPaidAmount > 0 && newBalanceAmount > 0) {
+          invoiceStatus = "partially_paid";
+        }
+
+        await tx.invoice.update({
+          where: {
+            id: invoice.id,
+          },
+          data: {
+            paidAmount: newPaidAmount,
+            balanceAmount: newBalanceAmount,
+            status: invoiceStatus,
+          },
+        });
+      }
+    });
+
+    res.json({
+      message: "Payment deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete payment error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete payment.",
+    });
+  }
+});
+// =========================================================
+// MODULE 13 — FINANCE (TRANSACTIONS)
+// =========================================================
+
+app.use("/api/transactions", requireAuth);
+
+// GET ALL TRANSACTIONS
+app.get("/api/transactions", async (req, res) => {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      orderBy: {
+        transactionDate: "desc",
+      },
+      include: {
+        client: true,
+        invoice: true,
+      },
+    });
+
+    res.json(transactions);
+  } catch (err) {
+    console.error("Get transactions error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load transactions.",
+    });
+  }
+});
+
+
+// CREATE TRANSACTION
+app.post("/api/transactions", async (req, res) => {
+  try {
+    const {
+      clientId,
+      invoiceId,
+      type,
+      category,
+      amount,
+      description,
+      transactionDate,
+      reference,
+    } = req.body;
+
+    if (!type) {
+      return res.status(400).json({
+        error: "Transaction type is required.",
+      });
+    }
+
+    if (!category) {
+      return res.status(400).json({
+        error: "Transaction category is required.",
+      });
+    }
+
+    const transactionAmount = Number(amount);
+
+    if (!transactionAmount || transactionAmount <= 0) {
+      return res.status(400).json({
+        error: "Transaction amount must be greater than 0.",
+      });
+    }
+
+    if (clientId) {
+      const client = await prisma.client.findUnique({
+        where: {
+          id: clientId,
+        },
+      });
+
+      if (!client) {
+        return res.status(400).json({
+          error: "Client not found.",
+        });
+      }
+    }
+
+    if (invoiceId) {
+      const invoice = await prisma.invoice.findUnique({
+        where: {
+          id: invoiceId,
+        },
+      });
+
+      if (!invoice) {
+        return res.status(400).json({
+          error: "Invoice not found.",
+        });
+      }
+    }
+
+    const transactionNo = `TXN-${Date.now()}`;
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        transactionNo,
+        clientId: clientId || null,
+        invoiceId: invoiceId || null,
+        type,
+        category,
+        amount: transactionAmount,
+        description: description?.trim() || null,
+        transactionDate: transactionDate
+          ? new Date(transactionDate)
+          : new Date(),
+        reference: reference?.trim() || null,
+      },
+      include: {
+        client: true,
+        invoice: true,
+      },
+    });
+
+    res.status(201).json(transaction);
+  } catch (err) {
+    console.error("Create transaction error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create transaction.",
+    });
+  }
+});
+
+
+// GET SINGLE TRANSACTION
+app.get("/api/transactions/:id", async (req, res) => {
+  try {
+    const transaction = await prisma.transaction.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        client: true,
+        invoice: true,
+      },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        error: "Transaction not found.",
+      });
+    }
+
+    res.json(transaction);
+  } catch (err) {
+    console.error("Get transaction error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load transaction.",
+    });
+  }
+});
+
+
+// UPDATE TRANSACTION
+app.patch("/api/transactions/:id", async (req, res) => {
+  try {
+    const {
+      type,
+      category,
+      amount,
+      description,
+      transactionDate,
+      reference,
+    } = req.body;
+
+    const existingTransaction =
+      await prisma.transaction.findUnique({
+        where: {
+          id: req.params.id,
+        },
+      });
+
+    if (!existingTransaction) {
+      return res.status(404).json({
+        error: "Transaction not found.",
+      });
+    }
+
+    const transactionAmount =
+      amount !== undefined
+        ? Number(amount)
+        : Number(existingTransaction.amount);
+
+    if (!transactionAmount || transactionAmount <= 0) {
+      return res.status(400).json({
+        error: "Transaction amount must be greater than 0.",
+      });
+    }
+
+    const updatedTransaction =
+      await prisma.transaction.update({
+        where: {
+          id: req.params.id,
+        },
+        data: {
+          ...(type !== undefined && {
+            type,
+          }),
+
+          ...(category !== undefined && {
+            category,
+          }),
+
+          amount: transactionAmount,
+
+          ...(description !== undefined && {
+            description: description?.trim() || null,
+          }),
+
+          ...(transactionDate !== undefined && {
+            transactionDate: transactionDate
+              ? new Date(transactionDate)
+              : existingTransaction.transactionDate,
+          }),
+
+          ...(reference !== undefined && {
+            reference: reference?.trim() || null,
+          }),
+        },
+        include: {
+          client: true,
+          invoice: true,
+        },
+      });
+
+    res.json(updatedTransaction);
+  } catch (err) {
+    console.error("Update transaction error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update transaction.",
+    });
+  }
+});
+
+
+// DELETE TRANSACTION
+app.delete("/api/transactions/:id", async (req, res) => {
+  try {
+    const transaction =
+      await prisma.transaction.findUnique({
+        where: {
+          id: req.params.id,
+        },
+      });
+
+    if (!transaction) {
+      return res.status(404).json({
+        error: "Transaction not found.",
+      });
+    }
+
+    await prisma.transaction.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Transaction deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete transaction error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete transaction.",
+    });
+  }
+});
+// =========================================================
+// MODULE 14 — SUPPORT TICKETS
+// =========================================================
+
+app.use("/api/support-tickets", requireAuth);
+
+// GET ALL SUPPORT TICKETS
+app.get("/api/support-tickets", async (req, res) => {
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        client: true,
+      },
+    });
+
+    res.json(tickets);
+  } catch (err) {
+    console.error("Get support tickets error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load support tickets.",
+    });
+  }
+});
+
+// CREATE SUPPORT TICKET
+app.post("/api/support-tickets", async (req, res) => {
+  try {
+    const {
+      clientId,
+      subject,
+      description,
+      status,
+      priority,
+      category,
+      assignedTo,
+    } = req.body;
+
+    if (!subject || !String(subject).trim()) {
+      return res.status(400).json({
+        error: "Subject is required.",
+      });
+    }
+
+    if (clientId) {
+      const client = await prisma.client.findUnique({
+        where: {
+          id: clientId,
+        },
+      });
+
+      if (!client) {
+        return res.status(400).json({
+          error: "Client not found.",
+        });
+      }
+    }
+
+    const ticketNo = `TKT-${Date.now()}`;
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        ticketNo,
+        clientId: clientId || null,
+        subject: String(subject).trim(),
+        description: description?.trim() || null,
+        status: status || "open",
+        priority: priority || "medium",
+        category: category || "general",
+        assignedTo: assignedTo?.trim() || null,
+      },
+      include: {
+        client: true,
+      },
+    });
+
+    res.status(201).json(ticket);
+  } catch (err) {
+    console.error("Create support ticket error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create support ticket.",
+    });
+  }
+});
+
+// GET SINGLE SUPPORT TICKET
+app.get("/api/support-tickets/:id", async (req, res) => {
+  try {
+    const ticket = await prisma.supportTicket.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        client: true,
+      },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Support ticket not found.",
+      });
+    }
+
+    res.json(ticket);
+  } catch (err) {
+    console.error("Get support ticket error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load support ticket.",
+    });
+  }
+});
+
+// UPDATE SUPPORT TICKET
+app.patch("/api/support-tickets/:id", async (req, res) => {
+  try {
+    const {
+      subject,
+      description,
+      status,
+      priority,
+      category,
+      assignedTo,
+    } = req.body;
+
+    const existingTicket =
+      await prisma.supportTicket.findUnique({
+        where: {
+          id: req.params.id,
+        },
+      });
+
+    if (!existingTicket) {
+      return res.status(404).json({
+        error: "Support ticket not found.",
+      });
+    }
+
+    const updatedTicket =
+      await prisma.supportTicket.update({
+        where: {
+          id: req.params.id,
+        },
+        data: {
+          ...(subject !== undefined && {
+            subject: String(subject).trim(),
+          }),
+
+          ...(description !== undefined && {
+            description: description?.trim() || null,
+          }),
+
+          ...(status !== undefined && {
+            status,
+          }),
+
+          ...(priority !== undefined && {
+            priority,
+          }),
+
+          ...(category !== undefined && {
+            category,
+          }),
+
+          ...(assignedTo !== undefined && {
+            assignedTo: assignedTo?.trim() || null,
+          }),
+        },
+        include: {
+          client: true,
+        },
+      });
+
+    res.json(updatedTicket);
+  } catch (err) {
+    console.error("Update support ticket error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update support ticket.",
+    });
+  }
+});
+
+// DELETE SUPPORT TICKET
+app.delete("/api/support-tickets/:id", async (req, res) => {
+  try {
+    const ticket = await prisma.supportTicket.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Support ticket not found.",
+      });
+    }
+
+    await prisma.supportTicket.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Support ticket deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete support ticket error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete support ticket.",
+    });
+  }
+});
+// =========================================================
+// SERVER START — KEEP THIS AT THE VERY END
+// =========================================================
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`API server running on http://localhost:${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`API server running on http://localhost:${PORT}`);
+});
