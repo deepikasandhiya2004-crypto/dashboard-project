@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   MoreHorizontal,
   Clock3,
-  CheckCircle2,
-  UserPlus,
-  CalendarDays,
   DollarSign,
   Plus,
+  CalendarDays,
 } from "lucide-react";
 
 import {
@@ -15,1593 +13,365 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
 } from "recharts";
 
-import StatCard from "../components/StatCard.jsx";
-import ChartCard from "../components/ChartCard.jsx";
 import { api } from "../lib/api.js";
 
+const statusColors = {
+  new: "#7C3AED",
+  contacted: "#5BA8EF",
+  qualified: "#FF6A3D",
+  proposal: "#00DC46",
+  won: "#00C853",
+  lost: "#E00000",
+};
 
-/* =========================================================
-   GRAPH DATA
-========================================================= */
-
-const sampleTrend = [
-  { label: "May 1", value: 320 },
-  { label: "May 3", value: 450 },
-  { label: "May 5", value: 410 },
-  { label: "May 8", value: 520 },
-  { label: "May 11", value: 480 },
-  { label: "May 15", value: 740 },
-  { label: "May 18", value: 590 },
-  { label: "May 20", value: 750 },
-  { label: "May 22", value: 920 },
-  { label: "May 25", value: 750 },
-  { label: "May 27", value: 1000 },
-  { label: "May 29", value: 1248 },
-];
-
-
-/* =========================================================
-   DONUT DATA
-========================================================= */
-
-const projectData = [
-  {
-    name: "New",
-    percentage: 35,
-    value: 147,
-  },
-  {
-    name: "Contacted",
-    percentage: 25,
-    value: 312,
-  },
-  {
-    name: "Qualified",
-    percentage: 20,
-    value: 250,
-  },
-  {
-    name: "Proposal",
-    percentage: 25,
-    value: 187,
-  },
-  {
-    name: "Won",
-    percentage: 5,
-    value: 62,
-  },
-];
-
-const projectColors = [
-  "#7C3AED",
-  "#00DC46",
-  "#FF643F",
-  "#5BA8EF",
-  "#E00000",
-];
-
-
-/* =========================================================
-   PROJECT PROGRESS
-========================================================= */
-
-const progressData = [
-  {
-    name: "Completed",
-    value: 10,
-    percentage: "28%",
-  },
-  {
-    name: "In Progress",
-    value: 18,
-    percentage: "35%",
-  },
-  {
-    name: "On Hold",
-    value: 5,
-    percentage: "14%",
-  },
-  {
-    name: "Not Started",
-    value: 18,
-    percentage: "38%",
-  },
-];
-
-
-/* =========================================================
-   DASHBOARD
-========================================================= */
+const projectStatusColors = {
+  planning: "#5BA8EF",
+  active: "#7C3AED",
+  completed: "#00C853",
+};
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      api.getTasks(),
-      api.getProjects(),
-    ])
-      .then(([t, p]) => {
+    Promise.all([api.getTasks(), api.getProjects(), api.getLeads()])
+      .then(([t, p, l]) => {
         setTasks(t);
         setProjects(p);
+        setLeads(l);
       })
-      .catch((e) => {
-        setError(e.message);
-      });
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
-  const doneCount = tasks.filter(
-    (task) => task.status === "done"
-  ).length;
+  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const openTasks = tasks.filter((t) => t.status !== "done").length;
 
-  const openTasks = tasks.filter(
-    (task) => task.status !== "done"
-  ).length;
+  const totalLeads = leads.length;
+  const newLeads = leads.filter((l) => l.status === "new").length;
+  const contactedLeads = leads.filter((l) => l.status === "contacted").length;
+  const qualifiedLeads = leads.filter((l) => l.status === "qualified").length;
+  const revenue = leads
+    .filter((l) => l.status === "won")
+    .reduce((sum, l) => sum + (l.value || 0), 0);
 
+  const leadStatusOrder = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+  const pipelineData = useMemo(() => {
+    return leadStatusOrder
+      .map((status) => ({
+        name: status,
+        value: leads.filter((l) => l.status === status).length,
+      }))
+      .filter((d) => d.value > 0);
+  }, [leads]);
+
+  const projectStatusData = useMemo(() => {
+    return ["planning", "active", "completed"].map((status) => ({
+      name: status,
+      value: projects.filter((p) => p.status === status).length,
+    }));
+  }, [projects]);
+
+  const trendData = useMemo(() => {
+    const byDay = {};
+    projects.forEach((p) => {
+      const day = new Date(p.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      byDay[day] = (byDay[day] || 0) + 1;
+    });
+    return Object.entries(byDay).map(([label, value]) => ({ label, value }));
+  }, [projects]);
+
+  const activity = useMemo(() => {
+    const items = [
+      ...projects.map((p) => ({ text: `Project "${p.name}" created`, date: p.createdAt, icon: "project" })),
+      ...tasks.map((t) => ({ text: `Task "${t.title}" created`, date: t.createdAt, icon: "task" })),
+      ...leads.map((l) => ({ text: `Lead "${l.name}" added`, date: l.createdAt, icon: "lead" })),
+    ];
+    return items.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+  }, [projects, tasks, leads]);
+
+  const upcomingTasks = useMemo(() => {
+    return tasks
+      .filter((t) => t.status !== "done")
+      .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0))
+      .slice(0, 4);
+  }, [tasks]);
+
+  const recentLeads = useMemo(() => leads.slice(0, 4), [leads]);
 
   return (
-    <div
-      style={{
-        minHeight: "100%",
-        background: "#F7F5E9",
-        color: "#00373A",
-        paddingBottom: "30px",
-      }}
-    >
-
-      {/* =====================================================
-          PAGE HEADER
-      ===================================================== */}
-
-      <div
-        style={{
-          marginBottom: "18px",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "34px",
-            lineHeight: "40px",
-            color: "#202020",
-            fontWeight: 800,
-            letterSpacing: "-0.8px",
-          }}
-        >
+    <div style={{ minHeight: "100%", background: "#F7F5E9", color: "#00373A", paddingBottom: "30px" }}>
+      <div style={{ marginBottom: "18px" }}>
+        <h1 style={{ margin: 0, fontSize: "34px", lineHeight: "40px", color: "#202020", fontWeight: 800, letterSpacing: "-0.8px" }}>
           Dashboard
         </h1>
-
-        <p
-          style={{
-            margin: "2px 0 0",
-            fontSize: "15px",
-            lineHeight: "20px",
-            color: "rgba(0,55,58,0.40)",
-          }}
-        >
-          Welcome back, Isha
+        <p style={{ margin: "2px 0 0", fontSize: "15px", lineHeight: "20px", color: "rgba(0,55,58,0.40)" }}>
+          Live data from your database
         </p>
       </div>
 
-
-      {/* =====================================================
-          ERROR
-      ===================================================== */}
-
       {error && (
-        <div
-          style={{
-            marginBottom: "16px",
-            padding: "10px 14px",
-            borderRadius: "10px",
-            background: "rgba(255,106,61,0.10)",
-            fontSize: "13px",
-            color: "#00373A",
-          }}
-        >
-          Couldn't reach the API. Is the server running on
-          port 4000?
+        <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "rgba(255,106,61,0.10)", fontSize: "13px", color: "#00373A" }}>
+          Couldn't reach the API: {error}. Is the server running on port 4000?
         </div>
       )}
 
+      {loading ? (
+        <p style={{ fontSize: "13px", color: "rgba(0,55,58,0.5)" }}>Loading dashboard...</p>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "14px", marginBottom: "16px" }}>
+            <StatCardSimple label="Total Leads" value={totalLeads} color="#7C3AED" />
+            <StatCardSimple label="New Leads" value={newLeads} color="#00DC46" />
+            <StatCardSimple label="Contacted" value={contactedLeads} color="#FF643F" />
+            <StatCardSimple label="Qualified" value={qualifiedLeads} color="#7C3AED" />
+            <StatCardSimple label="Revenue (Won)" value={`$${revenue.toLocaleString()}`} color="#00C853" />
+          </div>
 
-      {/* =====================================================
-          STAT CARDS
-      ===================================================== */}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(5, minmax(0, 1fr))",
-          gap: "14px",
-          marginBottom: "16px",
-        }}
-      >
-
-        <StatCard
-          label="Total Leads"
-          value="1,248"
-          change="12.5%"
-          type="users"
-          color="#7C3AED"
-        />
-
-        <StatCard
-          label="New Leads"
-          value="437"
-          change="14.8%"
-          type="new"
-          color="#00DC46"
-        />
-
-        <StatCard
-          label="Contacted"
-          value="312"
-          change="8.3%"
-          type="contacted"
-          color="#FF643F"
-        />
-
-        <StatCard
-          label="Qualified"
-          value="250"
-          change="16.7%"
-          type="qualified"
-          color="#7C3AED"
-        />
-
-        <StatCard
-          label="Revenue This Month"
-          value="$ 8,76,540"
-          change="11.4%"
-          type="revenue"
-          color="#00C853"
-        />
-
-      </div>
-
-
-      {/* =====================================================
-          FIRST ROW
-      ===================================================== */}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "minmax(0, 2fr) minmax(280px, 1.45fr) minmax(280px, 1.45fr)",
-          gap: "10px",
-          marginBottom: "10px",
-        }}
-      >
-
-        {/* =================================================
-            PROJECT ACTIVITY
-        ================================================= */}
-
-        <ChartCard
-          title="Project Activity"
-          data={sampleTrend}
-          color="#7C3AED"
-        />
-
-{/* =================================================
-    PROJECT OVERVIEW / DONUT
-================================================= */}
-
-<div
-  style={{
-    background: "#FAF9F0",
-    border: "1px solid rgba(0,55,58,0.16)",
-    borderRadius: "16px",
-    padding: "16px",
-    minHeight: "260px",
-    boxSizing: "border-box",
-  }}
->
-  {/* HEADER */}
-
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-    }}
-  >
-    <h3
-      style={{
-        margin: 0,
-        fontSize: "18px",
-        lineHeight: "23px",
-        color: "#202020",
-        fontWeight: 800,
-      }}
-    >
-      Project Overview
-    </h3>
-
-    <MoreHorizontal
-      size={20}
-      strokeWidth={2}
-      color="rgba(0,55,58,0.45)"
-    />
-  </div>
-
-
-  {/* DONUT + LEGEND */}
-
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "145px 1fr",
-      alignItems: "center",
-      columnGap: "10px",
-      marginTop: "8px",
-    }}
-  >
-
-    {/* DONUT */}
-
-    <div
-      style={{
-        position: "relative",
-        width: "145px",
-        height: "175px",
-      }}
-    >
-      <ResponsiveContainer
-        width="100%"
-        height="100%"
-      >
-        <PieChart>
-
-          <Pie
-            data={projectData}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={48}
-            outerRadius={70}
-            startAngle={90}
-            endAngle={-270}
-            paddingAngle={1}
-            stroke="#FAF9F0"
-            strokeWidth={1}
-          >
-            {projectData.map(
-              (entry, index) => (
-                <Cell
-                  key={entry.name}
-                  fill={projectColors[index]}
-                />
-              )
-            )}
-          </Pie>
-
-          <Tooltip />
-
-        </PieChart>
-      </ResponsiveContainer>
-
-
-      {/* CENTER */}
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "13px",
-            lineHeight: "17px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          1248
-        </div>
-
-        <div
-          style={{
-            marginTop: "2px",
-            fontSize: "11px",
-            lineHeight: "14px",
-            color: "#202020",
-            fontWeight: 400,
-          }}
-        >
-          Total Project
-        </div>
-      </div>
-
-    </div>
-
-
-    {/* LEGEND */}
-
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "11px",
-        paddingRight: "2px",
-      }}
-    >
-
-      {projectData.map(
-        (item, index) => (
-          <div
-            key={item.name}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "8px",
-            }}
-          >
-
-            {/* DOT */}
-
-            <span
-              style={{
-                width: "10px",
-                height: "10px",
-                minWidth: "10px",
-                borderRadius: "50%",
-                background:
-                  projectColors[index],
-                marginTop: "4px",
-              }}
-            />
-
-
-            {/* NAME + PERCENTAGE */}
-
-            <div
-              style={{
-                minWidth: 0,
-              }}
-            >
-
-              <div
-                style={{
-                  fontSize: "13px",
-                  lineHeight: "16px",
-                  color: "#202020",
-                  fontWeight: 500,
-                }}
-              >
-                {item.name}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1.45fr) minmax(280px, 1.45fr)", gap: "10px", marginBottom: "10px" }}>
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Projects Created Over Time</h3>
+              <div style={{ width: "100%", height: "220px", marginTop: "10px" }}>
+                {trendData.length === 0 ? (
+                  <EmptyState text="No projects yet — add one on the Projects page." />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,55,58,0.1)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="value" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
-
-              <div
-                style={{
-                  fontSize: "11px",
-                  lineHeight: "15px",
-                  color: "#202020",
-                  fontWeight: 400,
-                }}
-              >
-                {item.percentage}%
-                {" "}
-                ({item.value})
-              </div>
-
             </div>
 
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h3 style={cardTitleStyle}>Lead Pipeline</h3>
+                <MoreHorizontal size={20} strokeWidth={2} color="rgba(0,55,58,0.45)" />
+              </div>
+
+              {pipelineData.length === 0 ? (
+                <EmptyState text="No leads yet." />
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "145px 1fr", alignItems: "center", columnGap: "10px", marginTop: "8px" }}>
+                  <div style={{ position: "relative", width: "145px", height: "175px" }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={pipelineData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={70} startAngle={90} endAngle={-270} paddingAngle={1} stroke="#FAF9F0" strokeWidth={1}>
+                          {pipelineData.map((entry) => (
+                            <Cell key={entry.name} fill={statusColors[entry.name] || "#999"} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                      <div style={{ fontSize: "13px", color: "#202020", fontWeight: 500 }}>{totalLeads}</div>
+                      <div style={{ marginTop: "2px", fontSize: "11px", color: "#202020" }}>Total Leads</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "11px" }}>
+                    {pipelineData.map((item) => (
+                      <div key={item.name} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                        <span style={{ width: "10px", height: "10px", minWidth: "10px", borderRadius: "50%", background: statusColors[item.name] || "#999", marginTop: "4px" }} />
+                        <div>
+                          <div style={{ fontSize: "13px", color: "#202020", fontWeight: 500, textTransform: "capitalize" }}>{item.name}</div>
+                          <div style={{ fontSize: "11px", color: "#202020" }}>{item.value}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h3 style={cardTitleStyle}>Upcoming Tasks</h3>
+                <Clock3 size={18} color="rgba(0,55,58,0.45)" />
+              </div>
+              <div style={{ marginTop: "17px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                {upcomingTasks.length === 0 ? (
+                  <EmptyState text="No open tasks." />
+                ) : (
+                  upcomingTasks.map((t) => (
+                    <TaskItem
+                      key={t.id}
+                      title={t.title}
+                      date={t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "No due date"}
+                      status={t.priority}
+                      color={t.priority === "high" ? "#7C3AED" : t.priority === "low" ? "#FF643F" : "#00C853"}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        )
+
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1.45fr) minmax(280px, 1.45fr)", gap: "10px" }}>
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Recent Leads</h3>
+              {recentLeads.length === 0 ? (
+                <EmptyState text="No leads yet." />
+              ) : (
+                <div style={{ width: "100%", overflowX: "auto", marginTop: "12px" }}>
+                  <table style={{ width: "100%", minWidth: "560px", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={tableHeadStyle}>LEAD NAME</th>
+                        <th style={tableHeadStyle}>SOURCE</th>
+                        <th style={tableHeadStyle}>STATUS</th>
+                        <th style={{ ...tableHeadStyle, textAlign: "right" }}>VALUE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentLeads.map((l) => (
+                        <LeadRow key={l.id} name={l.name} source={l.source || "—"} status={l.status} value={`$${(l.value || 0).toLocaleString()}`} color={statusColors[l.status] || "#999"} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Project Status</h3>
+              {projects.length === 0 ? (
+                <EmptyState text="No projects yet." />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "14px" }}>
+                  {projectStatusData.map((s) => (
+                    <div key={s.name}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                        <span style={{ textTransform: "capitalize", fontWeight: 500 }}>{s.name}</span>
+                        <span>{s.value}</span>
+                      </div>
+                      <div style={{ height: "8px", borderRadius: "4px", background: "rgba(0,55,58,0.08)" }}>
+                        <div
+                          style={{
+                            height: "100%",
+                            borderRadius: "4px",
+                            width: `${projects.length ? (s.value / projects.length) * 100 : 0}%`,
+                            background: projectStatusColors[s.name],
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Activity Feed</h3>
+              <div style={{ marginTop: "17px", display: "flex", flexDirection: "column", gap: "18px" }}>
+                {activity.length === 0 ? (
+                  <EmptyState text="No activity yet." />
+                ) : (
+                  activity.map((a, i) => (
+                    <ActivityItem
+                      key={i}
+                      icon={a.icon === "lead" ? <DollarSign size={15} strokeWidth={1.8} /> : a.icon === "task" ? <Plus size={15} strokeWidth={1.8} /> : <CalendarDays size={15} strokeWidth={1.8} />}
+                      text={a.text}
+                      time={new Date(a.date).toLocaleString()}
+                      color={a.icon === "lead" ? "#00C853" : a.icon === "task" ? "#7C3AED" : "#5BA8EF"}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
-
-    </div>
-
-  </div>
-</div>
-        {/* =================================================
-            UPCOMING TASKS
-        ================================================= */}
-
-        <div
-          style={{
-            background: "#FAF9F0",
-            border: "1px solid rgba(0,55,58,0.16)",
-            borderRadius: "16px",
-            padding: "16px",
-            minHeight: "260px",
-          }}
-        >
-
-          {/* TITLE */}
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "18px",
-                lineHeight: "23px",
-                color: "#202020",
-                fontWeight: 800,
-              }}
-            >
-              Upcoming Tasks
-            </h3>
-
-            <Clock3
-              size={18}
-              color="rgba(0,55,58,0.45)"
-            />
-
-          </div>
-
-
-          {/* TASKS */}
-
-          <div
-            style={{
-              marginTop: "17px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "14px",
-            }}
-          >
-
-            <TaskItem
-              title="Follow up with Isha"
-              date="Today, 11:00 AM"
-              status="High"
-              color="#7C3AED"
-            />
-
-            <TaskItem
-              title="Project Meeting"
-              date="Today, 2:30 PM"
-              status="Medium"
-              color="#00C853"
-            />
-
-            <TaskItem
-              title="Send Proposal Acme"
-              date="Tomorrow, 10:00 AM"
-              status="High"
-              color="#7C3AED"
-            />
-
-            <TaskItem
-              title="Review UI Design"
-              date="Tomorrow, 12:00 PM"
-              status="Low"
-              color="#FF643F"
-            />
-
-          </div>
-
-
-          {/* BUTTON */}
-
-          <button
-            style={{
-              marginTop: "12px",
-              border: "none",
-              background: "transparent",
-              color: "#7C3AED",
-              fontSize: "12px",
-              fontWeight: 500,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            View All Tasks&nbsp; →
-          </button>
-
-        </div>
-
-      </div>
-
-
-      {/* =====================================================
-          SECOND ROW
-      ===================================================== */}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "minmax(0, 2fr) minmax(280px, 1.45fr) minmax(280px, 1.45fr)",
-          gap: "10px",
-        }}
-      >
-
-        {/* =================================================
-            RECENT LEADS
-        ================================================= */}
-
-        <div
-          style={{
-            background: "#FAF9F0",
-            border: "1px solid rgba(0,55,58,0.16)",
-            borderRadius: "16px",
-            padding: "16px",
-            minHeight: "250px",
-          }}
-        >
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "12px",
-            }}
-          >
-
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "18px",
-                lineHeight: "23px",
-                color: "#202020",
-                fontWeight: 800,
-              }}
-            >
-              Recent Leads
-            </h3>
-
-            <button
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "#7C3AED",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              View All
-            </button>
-
-          </div>
-
-
-          {/* TABLE */}
-
-          <div
-            style={{
-              width: "100%",
-              overflowX: "auto",
-            }}
-          >
-
-            <table
-              style={{
-                width: "100%",
-                minWidth: "560px",
-                borderCollapse: "collapse",
-              }}
-            >
-
-              <thead>
-
-                <tr>
-
-                  <th style={tableHeadStyle}>
-                    LEAD NAME
-                  </th>
-
-                  <th style={tableHeadStyle}>
-                    SOURCE
-                  </th>
-
-                  <th style={tableHeadStyle}>
-                    STATUS
-                  </th>
-
-                  <th
-                    style={{
-                      ...tableHeadStyle,
-                      textAlign: "right",
-                    }}
-                  >
-                    VALUE
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                <LeadRow
-                  name="Isha"
-                  source="Media Ads"
-                  status="Active"
-                  value="$8,200"
-                  color="#7C3AED"
-                />
-
-                <LeadRow
-                  name="Iniya"
-                  source="LinkedIn Ads"
-                  status="Pending"
-                  value="$8,200"
-                  color="#FF643F"
-                />
-
-                <LeadRow
-                  name="Sivagnanam"
-                  source="Direct Outreach"
-                  status="Qualified"
-                  value="$45,000"
-                  color="#00C853"
-                />
-
-                <LeadRow
-                  name="Arun Kumar"
-                  source="Referral"
-                  status="Pending"
-                  value="$12,400"
-                  color="#FF643F"
-                />
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </div>
-
-
-       {/* =================================================
-    PROJECT OVERVIEW - FIGMA STYLE
-================================================= */}
-
-<div
-  style={{
-    background: "#FAF9F0",
-    border: "1px solid rgba(0,55,58,0.20)",
-    borderRadius: "16px",
-    padding: "16px 18px",
-    minHeight: "250px",
-    boxSizing: "border-box",
-  }}
->
-  {/* TITLE */}
-
-  <h3
-    style={{
-      margin: 0,
-      fontSize: "18px",
-      lineHeight: "23px",
-      color: "#202020",
-      fontWeight: 800,
-    }}
-  >
-    Project Overview
-  </h3>
-
-  {/* CHART AREA */}
-
-  <div
-    style={{
-      position: "relative",
-      width: "100%",
-      height: "180px",
-      marginTop: "8px",
-    }}
-  >
-
-    {/* TOP LABELS */}
-
-    <div
-      style={{
-        position: "absolute",
-        top: "0",
-        left: "0",
-        right: "0",
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        textAlign: "center",
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontSize: "12px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          Completed
-        </div>
-
-        <div
-          style={{
-            marginTop: "5px",
-            fontSize: "11px",
-            color: "#202020",
-          }}
-        >
-          10(28%)
-        </div>
-      </div>
-
-      <div>
-        {/* EMPTY */}
-      </div>
-
-      <div>
-        <div
-          style={{
-            fontSize: "12px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          Not Started
-        </div>
-
-        <div
-          style={{
-            marginTop: "5px",
-            fontSize: "11px",
-            color: "#202020",
-          }}
-        >
-          18(38%)
-        </div>
-      </div>
-
-      <div>
-        {/* EMPTY */}
-      </div>
-    </div>
-
-
-    {/* DOTTED BASE LINE */}
-
-    <div
-      style={{
-        position: "absolute",
-        left: "0",
-        right: "0",
-        top: "94px",
-        borderTop:
-          "2px dotted rgba(0,55,58,0.45)",
-      }}
-    />
-
-
-    {/* VERTICAL BARS */}
-
-    <div
-      style={{
-        position: "absolute",
-        left: "0",
-        right: "0",
-        top: "38px",
-        height: "105px",
-        display: "grid",
-        gridTemplateColumns:
-          "repeat(4, 1fr)",
-        alignItems: "center",
-        textAlign: "center",
-      }}
-    >
-
-      {/* COMPLETED */}
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            width: "12px",
-            height: "68px",
-            background: "#7C3AED",
-            borderRadius: "5px",
-          }}
-        />
-
-        <div
-          style={{
-            width: "11px",
-            height: "11px",
-            marginTop: "6px",
-            borderRadius: "50%",
-            background: "#7C3AED",
-          }}
-        />
-      </div>
-
-
-      {/* IN PROGRESS */}
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            width: "12px",
-            height: "45px",
-            background: "#00DC46",
-            borderRadius: "5px",
-          }}
-        />
-
-        <div
-          style={{
-            width: "11px",
-            height: "11px",
-            marginTop: "6px",
-            borderRadius: "50%",
-            background: "#00DC46",
-          }}
-        />
-      </div>
-
-
-      {/* ON HOLD */}
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            width: "12px",
-            height: "36px",
-            background: "#FF643F",
-            borderRadius: "5px",
-          }}
-        />
-
-        <div
-          style={{
-            width: "11px",
-            height: "11px",
-            marginTop: "6px",
-            borderRadius: "50%",
-            background: "#FF643F",
-          }}
-        />
-      </div>
-
-
-      {/* NOT STARTED */}
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            width: "12px",
-            height: "60px",
-            background: "#5BA8EF",
-            borderRadius: "5px",
-          }}
-        />
-
-        <div
-          style={{
-            width: "11px",
-            height: "11px",
-            marginTop: "6px",
-            borderRadius: "50%",
-            background: "#5BA8EF",
-          }}
-        />
-      </div>
-
-    </div>
-
-
-    {/* BOTTOM LABELS */}
-
-    <div
-      style={{
-        position: "absolute",
-        left: "0",
-        right: "0",
-        bottom: "-2px",
-        display: "grid",
-        gridTemplateColumns:
-          "repeat(4, 1fr)",
-        textAlign: "center",
-      }}
-    >
-
-      {/* IN PROGRESS */}
-
-      <div
-        style={{
-          textAlign: "left",
-          paddingLeft: "2px",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "12px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          In Progress
-        </div>
-
-        <div
-          style={{
-            marginTop: "5px",
-            fontSize: "11px",
-            color: "#202020",
-          }}
-        >
-          18 (35%)
-        </div>
-      </div>
-
-
-      {/* EMPTY */}
-
-      <div></div>
-
-
-      {/* ON HOLD */}
-
-      <div
-        style={{
-          textAlign: "left",
-          paddingLeft: "2px",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "12px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          On Hold
-        </div>
-
-        <div
-          style={{
-            marginTop: "5px",
-            fontSize: "11px",
-            color: "#202020",
-          }}
-        >
-          5(14%)
-        </div>
-      </div>
-
-
-      {/* EMPTY */}
-
-      <div></div>
-
-    </div>
-
-  </div>
-</div>
-        {/* =================================================
-            ACTIVITY FEED
-        ================================================= */}
-
-        <div
-          style={{
-            background: "#FAF9F0",
-            border: "1px solid rgba(0,55,58,0.16)",
-            borderRadius: "16px",
-            padding: "16px",
-            minHeight: "250px",
-          }}
-        >
-
-          <h3
-            style={{
-              margin: 0,
-              fontSize: "18px",
-              lineHeight: "23px",
-              color: "#202020",
-              fontWeight: 800,
-            }}
-          >
-            Activity Feed
-          </h3>
-
-
-          <div
-            style={{
-              marginTop: "17px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "18px",
-            }}
-          >
-
-            <ActivityItem
-              icon={
-                <DollarSign
-                  size={15}
-                  strokeWidth={1.8}
-                />
-              }
-              text="Isha moved to Qualified"
-              time="2 min ago"
-              color="#00C853"
-            />
-
-            <ActivityItem
-              icon={
-                <Plus
-                  size={15}
-                  strokeWidth={1.8}
-                />
-              }
-              text="New lead Lisa Taylor added"
-              time="15 min ago"
-              color="#7C3AED"
-            />
-
-            <ActivityItem
-              icon={
-                <CalendarDays
-                  size={15}
-                  strokeWidth={1.8}
-                />
-              }
-              text='Project "Website Redesign" updated'
-              time="1 hour ago"
-              color="#5BA8EF"
-            />
-
-          </div>
-
-
-          <button
-            style={{
-              marginTop: "15px",
-              border: "none",
-              background: "transparent",
-              color: "#7C3AED",
-              fontSize: "12px",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            View All Tasks&nbsp; →
-          </button>
-
-        </div>
-
-      </div>
-
-
-      {/* =====================================================
-          REAL DATABASE SUMMARY
-      ===================================================== */}
-
-      {(projects.length > 0 ||
-        tasks.length > 0) && (
-        <div
-          style={{
-            marginTop: "10px",
-            background: "#FAF9F0",
-            border:
-              "1px solid rgba(0,55,58,0.16)",
-            borderRadius: "16px",
-            padding: "14px 16px",
-          }}
-        >
-
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "30px",
-              fontSize: "12px",
-              color:
-                "rgba(0,55,58,0.55)",
-            }}
-          >
-
-            <span>
-              Real Projects:{" "}
-              <strong
-                style={{
-                  color: "#202020",
-                }}
-              >
-                {projects.length}
-              </strong>
-            </span>
-
-            <span>
-              Open Tasks:{" "}
-              <strong
-                style={{
-                  color: "#202020",
-                }}
-              >
-                {openTasks}
-              </strong>
-            </span>
-
-            <span>
-              Completed Tasks:{" "}
-              <strong
-                style={{
-                  color: "#202020",
-                }}
-              >
-                {doneCount}
-              </strong>
-            </span>
-
-          </div>
-
-        </div>
-      )}
-
     </div>
   );
 }
 
-
-/* =========================================================
-   TASK ITEM
-========================================================= */
-
-function TaskItem({
-  title,
-  date,
-  status,
-  color,
-}) {
+function StatCardSimple({ label, value, color }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns:
-          "4px 18px minmax(0,1fr) auto",
-        alignItems: "center",
-        columnGap: "9px",
-      }}
-    >
+    <div style={{ background: "#FAF9F0", border: "1px solid rgba(0,55,58,0.18)", borderRadius: "16px", padding: "16px 18px", minHeight: "92px", boxSizing: "border-box" }}>
+      <div style={{ fontSize: "14px", color: "#161616", fontWeight: 500 }}>{label}</div>
+      <div style={{ marginTop: "4px", fontSize: "22px", color, fontWeight: 800 }}>{value}</div>
+    </div>
+  );
+}
 
-      {/* COLOR LINE */}
+function EmptyState({ text }) {
+  return (
+    <div style={{ padding: "24px 0", textAlign: "center", fontSize: "12px", color: "rgba(0,55,58,0.4)" }}>
+      {text}
+    </div>
+  );
+}
 
-      <span
-        style={{
-          width: "3px",
-          height: "30px",
-          borderRadius: "4px",
-          background: color,
-        }}
-      />
-
-
-      {/* CHECKBOX */}
-
-      <span
-        style={{
-          width: "18px",
-          height: "18px",
-          borderRadius: "4px",
-          border:
-            "1px solid rgba(0,55,58,0.18)",
-          boxSizing: "border-box",
-        }}
-      />
-
-
-      {/* TEXT */}
-
-      <div
-        style={{
-          minWidth: 0,
-        }}
-      >
-
-        <div
-          style={{
-            fontSize: "12px",
-            lineHeight: "16px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          {title}
-        </div>
-
-        <div
-          style={{
-            marginTop: "2px",
-            fontSize: "10px",
-            lineHeight: "13px",
-            color:
-              "rgba(0,55,58,0.36)",
-          }}
-        >
-          {date}
-        </div>
-
+function TaskItem({ title, date, status, color }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "4px 18px minmax(0,1fr) auto", alignItems: "center", columnGap: "9px" }}>
+      <span style={{ width: "3px", height: "30px", borderRadius: "4px", background: color }} />
+      <span style={{ width: "18px", height: "18px", borderRadius: "4px", border: "1px solid rgba(0,55,58,0.18)", boxSizing: "border-box" }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: "12px", color: "#202020", fontWeight: 500 }}>{title}</div>
+        <div style={{ marginTop: "2px", fontSize: "10px", color: "rgba(0,55,58,0.36)" }}>{date}</div>
       </div>
-
-
-      {/* STATUS */}
-
-      <span
-        style={{
-          padding: "4px 10px",
-          borderRadius: "6px",
-          background: `${color}18`,
-          color: color,
-          fontSize: "10px",
-          lineHeight: "12px",
-          fontWeight: 600,
-          whiteSpace: "nowrap",
-        }}
-      >
+      <span style={{ padding: "4px 10px", borderRadius: "6px", background: `${color}18`, color, fontSize: "10px", fontWeight: 600, whiteSpace: "nowrap", textTransform: "capitalize" }}>
         {status}
       </span>
-
     </div>
   );
 }
 
-
-/* =========================================================
-   LEAD ROW
-========================================================= */
-
-function LeadRow({
-  name,
-  source,
-  status,
-  value,
-  color,
-}) {
+function LeadRow({ name, source, status, value, color }) {
   return (
-    <tr
-      style={{
-        borderBottom:
-          "1px solid rgba(0,55,58,0.10)",
-      }}
-    >
-
-      {/* NAME */}
-
-      <td
-        style={{
-          padding: "8px 4px",
-        }}
-      >
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "9px",
-          }}
-        >
-
-          <span
-            style={{
-              width: "25px",
-              height: "25px",
-              minWidth: "25px",
-              borderRadius: "50%",
-              background: color,
-              color: "#FFFFFF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "10px",
-              fontWeight: 500,
-            }}
-          >
-            {name.charAt(0)}
+    <tr style={{ borderBottom: "1px solid rgba(0,55,58,0.10)" }}>
+      <td style={{ padding: "8px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+          <span style={{ width: "25px", height: "25px", minWidth: "25px", borderRadius: "50%", background: color, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 500 }}>
+            {name.charAt(0).toUpperCase()}
           </span>
-
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#202020",
-              fontWeight: 500,
-            }}
-          >
-            {name}
-          </span>
-
+          <span style={{ fontSize: "12px", color: "#202020", fontWeight: 500 }}>{name}</span>
         </div>
-
       </td>
-
-
-      {/* SOURCE */}
-
-      <td
-        style={{
-          padding: "8px 4px",
-          fontSize: "11px",
-          color:
-            "rgba(0,55,58,0.42)",
-        }}
-      >
-        {source}
-      </td>
-
-
-      {/* STATUS */}
-
-      <td
-        style={{
-          padding: "8px 4px",
-        }}
-      >
-
-        <span
-          style={{
-            display: "inline-block",
-            padding: "4px 11px",
-            borderRadius: "12px",
-            background: `${color}20`,
-            color: color,
-            fontSize: "10px",
-            lineHeight: "12px",
-            fontWeight: 600,
-          }}
-        >
+      <td style={{ padding: "8px 4px", fontSize: "11px", color: "rgba(0,55,58,0.42)" }}>{source}</td>
+      <td style={{ padding: "8px 4px" }}>
+        <span style={{ display: "inline-block", padding: "4px 11px", borderRadius: "12px", background: `${color}20`, color, fontSize: "10px", fontWeight: 600, textTransform: "capitalize" }}>
           {status}
         </span>
-
       </td>
-
-
-      {/* VALUE */}
-
-      <td
-        style={{
-          padding: "8px 4px",
-          textAlign: "right",
-          fontSize: "12px",
-          color: "#202020",
-          fontWeight: 500,
-        }}
-      >
-        {value}
-      </td>
-
+      <td style={{ padding: "8px 4px", textAlign: "right", fontSize: "12px", color: "#202020", fontWeight: 500 }}>{value}</td>
     </tr>
   );
 }
 
-
-/* =========================================================
-   ACTIVITY ITEM
-========================================================= */
-
-function ActivityItem({
-  icon,
-  text,
-  time,
-  color,
-}) {
+function ActivityItem({ icon, text, time, color }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: "11px",
-      }}
-    >
-
-      {/* ICON */}
-
-      <div
-        style={{
-          width: "25px",
-          height: "25px",
-          minWidth: "25px",
-          borderRadius: "50%",
-          border: `1px solid ${color}55`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: color,
-          background: "#FAF9F0",
-        }}
-      >
+    <div style={{ display: "flex", alignItems: "flex-start", gap: "11px" }}>
+      <div style={{ width: "25px", height: "25px", minWidth: "25px", borderRadius: "50%", border: `1px solid ${color}55`, display: "flex", alignItems: "center", justifyContent: "center", color, background: "#FAF9F0" }}>
         {icon}
       </div>
-
-
-      {/* TEXT */}
-
       <div>
-
-        <div
-          style={{
-            fontSize: "12px",
-            lineHeight: "16px",
-            color: "#202020",
-            fontWeight: 500,
-          }}
-        >
-          {text}
-        </div>
-
-        <div
-          style={{
-            marginTop: "2px",
-            fontSize: "10px",
-            lineHeight: "13px",
-            color:
-              "rgba(0,55,58,0.34)",
-          }}
-        >
-          {time}
-        </div>
-
+        <div style={{ fontSize: "12px", color: "#202020", fontWeight: 500 }}>{text}</div>
+        <div style={{ marginTop: "2px", fontSize: "10px", color: "rgba(0,55,58,0.34)" }}>{time}</div>
       </div>
-
     </div>
   );
 }
 
-
-/* =========================================================
-   TABLE HEADER STYLE
-========================================================= */
-
-const tableHeadStyle = {
-  padding: "0 4px 8px",
-  borderBottom:
-    "1px solid rgba(0,55,58,0.14)",
-  fontSize: "10px",
-  lineHeight: "13px",
-  color: "rgba(0,55,58,0.55)",
-  fontWeight: 600,
-  textAlign: "left",
-};
+const cardStyle = { background: "#FAF9F0", border: "1px solid rgba(0,55,58,0.16)", borderRadius: "16px", padding: "16px", minHeight: "260px", boxSizing: "border-box" };
+const cardTitleStyle = { margin: 0, fontSize: "18px", lineHeight: "23px", color: "#202020", fontWeight: 800 };
+const tableHeadStyle = { padding: "0 4px 8px", borderBottom: "1px solid rgba(0,55,58,0.14)", fontSize: "10px", color: "rgba(0,55,58,0.55)", fontWeight: 600, textAlign: "left" };

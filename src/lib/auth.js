@@ -19,3 +19,8 @@ export function getUser() {
   const raw = localStorage.getItem(USER_KEY);
   return raw ? JSON.parse(raw) : null;
 }
+
+export function hasRole(...roles) {
+  const user = getUser();
+  return !!user && roles.includes(user.role);
+}
