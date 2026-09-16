@@ -11,12 +11,14 @@ import {
   LifeBuoy,
   BarChart3,
   Settings as SettingsIcon,
+  FileText,
 } from "lucide-react";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/clients", label: "Clients / Deals", icon: Building2 },
+  { to: "/proposals", label: "Proposals", icon: FileText },
   { to: "/projects", label: "Project / Delivery", icon: FolderKanban },
   { to: "/tasks", label: "Task", icon: CheckSquare },
   { to: "/marketing", label: "Marketing", icon: Megaphone },

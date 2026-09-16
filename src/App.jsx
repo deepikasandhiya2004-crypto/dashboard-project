@@ -17,6 +17,7 @@ import Finance from "./pages/Finance.jsx";
 import Support from "./pages/Support.jsx";
 import Reports from "./pages/Reports.jsx";
 import Settings from "./pages/Settings.jsx";
+import Proposals from "./pages/Proposals.jsx";
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/leads" element={<Leads />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/projects" element={<Projects />} />
+          <Route path="/proposals" element={<Proposals />} />
         <Route path="/projects/:id" element={<ProjectDetails />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/tasks/my" element={<Tasks tab="my" />} />
