@@ -1,9 +1,15 @@
-import "dotenv/config";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { signToken, requireAuth } from "./auth.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 const prisma = new PrismaClient();
 const app = express();
@@ -33,9 +39,10 @@ app.post("/api/auth/register", async (req, res) => {
     const token = signToken(user);
     res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email } });
   } catch (err) {
-    console.error("Register error:", err.message);
+    console.error("Register error:", err);
     res.status(500).json({
-      error: "Unable to connect to the database. Please verify your DATABASE_URL in server/.env.",
+      error: err.message || "Unable to connect to the database. Please verify your DATABASE_URL in server/.env.",
+      details: err.code || err.name,
     });
   }
 });
