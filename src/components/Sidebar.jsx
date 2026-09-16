@@ -1,6 +1,8 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
+  Users,
+  Building2,
   FolderKanban,
   CheckSquare,
   Megaphone,
@@ -13,6 +15,8 @@ import {
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/leads", label: "Leads", icon: Users },
+  { to: "/clients", label: "Clients / Deals", icon: Building2 },
   { to: "/projects", label: "Project / Delivery", icon: FolderKanban },
   { to: "/tasks", label: "Task", icon: CheckSquare },
   { to: "/marketing", label: "Marketing", icon: Megaphone },

@@ -221,6 +221,31 @@ export default function Header() {
 
           </div>
 
+
+          {/* ================= LOGOUT ================= */}
+
+          <button
+            type="button"
+            aria-label="Logout"
+            onClick={handleLogout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 12px",
+              border: "1px solid rgba(0,55,58,0.22)",
+              borderRadius: "10px",
+              background: "transparent",
+              color: "#00373A",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <LogOut size={16} strokeWidth={1.8} />
+            Logout
+          </button>
+
         </div>
       </div>
     </header>

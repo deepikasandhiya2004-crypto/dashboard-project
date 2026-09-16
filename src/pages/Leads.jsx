@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable.jsx";
 import { api } from "../lib/api.js";
 
-const statuses = ["planning", "active", "completed"];
+const statuses = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
-export default function Projects() {
-  const [projects, setProjects] = useState([]);
+export default function Leads() {
+  const [leads, setLeads] = useState([]);
   const [name, setName] = useState("");
-  const [client, setClient] = useState("");
+  const [email, setEmail] = useState("");
+  const [source, setSource] = useState("");
   const [error, setError] = useState("");
 
   function load() {
-    api.getProjects().then(setProjects).catch((e) => setError(e.message));
+    api.getLeads().then(setLeads).catch((e) => setError(e.message));
   }
 
   useEffect(load, []);
@@ -20,32 +21,32 @@ export default function Projects() {
     e.preventDefault();
     if (!name.trim()) return;
     try {
-      const created = await api.createProject({ name, client, status: "planning", progress: 0 });
-      setProjects((prev) => [created, ...prev]);
+      const created = await api.createLead({ name, email, source, status: "new", value: 0 });
+      setLeads((prev) => [created, ...prev]);
       setName("");
-      setClient("");
+      setEmail("");
+      setSource("");
     } catch (e) {
       setError(e.message);
     }
   }
 
   async function handleStatusChange(id, status) {
-    const previous = projects;
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+    const previous = leads;
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     try {
-      await api.updateProject(id, { status });
+      await api.updateLead(id, { status });
     } catch (e) {
       setError(e.message);
-      setProjects(previous); // roll back if the update actually failed
+      setLeads(previous);
     }
   }
 
   async function handleDelete(id) {
     setError("");
     try {
-      await api.deleteProject(id);
-      // Only remove it from the screen once the backend confirms it's actually deleted.
-      setProjects((prev) => prev.filter((p) => p.id !== id));
+      await api.deleteLead(id);
+      setLeads((prev) => prev.filter((l) => l.id !== id));
     } catch (e) {
       setError(e.message);
     }
@@ -54,7 +55,7 @@ export default function Projects() {
   return (
     <div>
       <h1 className="text-2xl text-dark" style={{ fontWeight: 800 }}>
-        Projects
+        Leads
       </h1>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -62,16 +63,23 @@ export default function Projects() {
       <form onSubmit={handleAdd} className="mt-6 flex flex-col gap-3 md:flex-row">
         <input
           type="text"
-          placeholder="Project name"
+          placeholder="Lead name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="flex-1 rounded-lg border border-dark/15 px-4 py-3 outline-none focus:border-dark"
         />
         <input
+          type="email"
+          placeholder="Email (optional)"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="flex-1 rounded-lg border border-dark/15 px-4 py-3 outline-none focus:border-dark"
+        />
+        <input
           type="text"
-          placeholder="Client (optional)"
-          value={client}
-          onChange={(e) => setClient(e.target.value)}
+          placeholder="Source (optional)"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
           className="flex-1 rounded-lg border border-dark/15 px-4 py-3 outline-none focus:border-dark"
         />
         <button
@@ -79,15 +87,16 @@ export default function Projects() {
           className="rounded-full px-6 py-3 text-dark"
           style={{ backgroundColor: "#00DC46", fontWeight: 700 }}
         >
-          Add project
+          Add lead
         </button>
       </form>
 
       <div className="mt-6">
         <DataTable
           columns={[
-            { key: "name", label: "Project" },
-            { key: "client", label: "Client", render: (r) => r.client || "—" },
+            { key: "name", label: "Name" },
+            { key: "email", label: "Email", render: (r) => r.email || "—" },
+            { key: "source", label: "Source", render: (r) => r.source || "—" },
             {
               key: "status",
               label: "Status",
@@ -95,7 +104,7 @@ export default function Projects() {
                 <select
                   value={r.status}
                   onChange={(e) => handleStatusChange(r.id, e.target.value)}
-                  className="rounded-full border border-dark/15 px-3 py-1.5 text-xs"
+                  className="rounded-full border border-dark/15 px-3 py-1.5 text-xs capitalize"
                 >
                   {statuses.map((s) => (
                     <option key={s} value={s}>
@@ -105,6 +114,7 @@ export default function Projects() {
                 </select>
               ),
             },
+            { key: "value", label: "Value", render: (r) => `$${(r.value || 0).toLocaleString()}` },
             {
               key: "actions",
               label: "",
@@ -115,7 +125,7 @@ export default function Projects() {
               ),
             },
           ]}
-          rows={projects}
+          rows={leads}
         />
       </div>
     </div>

@@ -3,7 +3,11 @@ import DashboardLayout from "./layouts/DashboardLayout.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Leads from "./pages/Leads.jsx";
+import Clients from "./pages/Clients.jsx";
 import Projects from "./pages/Projects.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import Marketing from "./pages/Marketing.jsx";
@@ -18,6 +22,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         element={
           <RequireAuth>
@@ -26,6 +32,8 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/leads" element={<Leads />} />
+        <Route path="/clients" element={<Clients />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/marketing" element={<Marketing />} />
