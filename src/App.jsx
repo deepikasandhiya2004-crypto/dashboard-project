@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Leads from "./pages/Leads.jsx";
 import Clients from "./pages/Clients.jsx";
 import Projects from "./pages/Projects.jsx";
+import ProjectDetails from "./pages/ProjectDetails.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import Marketing from "./pages/Marketing.jsx";
 import Calendar from "./pages/Calendar.jsx";
@@ -35,7 +36,11 @@ export default function App() {
         <Route path="/leads" element={<Leads />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:id" element={<ProjectDetails />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/tasks/my" element={<Tasks tab="my" />} />
+        <Route path="/tasks/team" element={<Tasks tab="team" />} />
+        <Route path="/tasks/:id" element={<Tasks />} />
         <Route path="/marketing" element={<Marketing />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/finance" element={<Finance />} />

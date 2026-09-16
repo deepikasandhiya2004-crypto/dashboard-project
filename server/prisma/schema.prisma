@@ -8,16 +8,17 @@ datasource db {
 }
 
 model User {
-  id                String       @id @default(cuid())
-  name              String
-  email             String       @unique
-  password          String
-  role              String       @default("member") // admin | member
-  resetToken        String?      @unique
-  resetTokenExpiry  DateTime?
-  departmentId      String?
-  department        Department?  @relation(fields: [departmentId], references: [id])
-  createdAt         DateTime     @default(now())
+  id               String          @id @default(cuid())
+  name             String
+  email            String          @unique
+  password         String
+  role             String          @default("member") // admin | member
+  resetToken       String?         @unique
+  resetTokenExpiry DateTime?
+  departmentId     String?
+  department       Department?     @relation(fields: [departmentId], references: [id])
+  createdAt        DateTime        @default(now())
+  projectMembers   ProjectMember[]
 }
 
 model Department {
@@ -53,24 +54,153 @@ model RolePermission {
 }
 
 model Project {
-  id        String   @id @default(cuid())
-  name      String
-  client    String?
-  status    String   @default("planning") // planning | active | completed
-  progress  Int      @default(0)
-  createdAt DateTime @default(now())
+  id         String            @id @default(cuid())
+  name       String
+  client     String?
+  status     String            @default("planning") // planning | active | completed
+  progress   Int               @default(0)
+  startDate  DateTime?
+  dueDate    DateTime?
+  createdAt  DateTime          @default(now())
+  tasks      Task[]
+  milestones Milestone[]
+  team       ProjectMember[]
+  files      ProjectFile[]
+  feedbacks  ClientFeedback[]
+  activities ProjectActivity[]
 }
 
 model Task {
   id        String    @id @default(cuid())
   title     String
   assignee  String?
-  priority  String    @default("medium") // low | medium | high
+  priority  String    @default("medium") // low | medium | high | urgent
   status    String    @default("todo") // todo | in_progress | done
+  startDate DateTime?
+  dueDate   DateTime?
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+}
+
+model Milestone {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  status    String    @default("pending") // pending | completed
   dueDate   DateTime?
   createdAt DateTime  @default(now())
 }
 
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  role      String   @default("Member")
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, name])
+}
+
+model ProjectFile {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name       String
+  size       String?
+  type       String?
+  uploadedAt DateTime @default(now())
+}
+
+model ClientFeedback {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clientName String
+  rating     Int      @default(5)
+  comment    String
+  status     String   @default("reviewed") // pending | reviewed
+  createdAt  DateTime @default(now())
+}
+
+model ProjectActivity {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  action    String
+  user      String
+  createdAt DateTime @default(now())
+}
+
+// Module 8: Marketing Models
+model Campaign {
+  id        String          @id @default(cuid())
+  name      String
+  status    String          @default("planning") // planning | active | completed | paused
+  startDate DateTime?
+  endDate   DateTime?
+  budget    Float?          @default(0)
+  createdAt DateTime        @default(now())
+  leads     MarketingLead[]
+}
+
+model MarketingLead {
+  id         String    @id @default(cuid())
+  name       String
+  email      String?
+  source     String    @default("website") // website | referral | social | ad | email
+  status     String    @default("new") // new | contacted | qualified | converted | lost
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+}
+
+model MarketingContent {
+  id          String    @id @default(cuid())
+  title       String
+  type        String    @default("blog") // blog | video | social | email | case_study
+  status      String    @default("draft") // draft | review | published
+  publishDate DateTime?
+  author      String?
+  createdAt   DateTime  @default(now())
+}
+
+model SocialPost {
+  id            String    @id @default(cuid())
+  platform      String    @default("linkedin") // linkedin | twitter | instagram | facebook
+  content       String
+  status        String    @default("draft") // draft | scheduled | published
+  scheduledDate DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+// Module 9: Calendar Models
+model Meeting {
+  id        String   @id @default(cuid())
+  title     String
+  date      DateTime
+  startTime String
+  endTime   String
+  attendees String?
+  location  String?
+  createdAt DateTime @default(now())
+}
+
+model FollowUp {
+  id        String   @id @default(cuid())
+  title     String
+  date      DateTime
+  client    String?
+  notes     String?
+  status    String   @default("pending") // pending | completed
+  createdAt DateTime @default(now())
+}
+
+// CRM Models from origin/main
 model Lead {
   id         String     @id @default(cuid())
   name       String
@@ -85,28 +215,28 @@ model Lead {
 }
 
 model Client {
-  id        String     @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  company   String?
-  deals     Deal[]
-  proposals Proposal[]
+  id         String     @id @default(cuid())
+  name       String
+  email      String?
+  phone      String?
+  company    String?
+  deals      Deal[]
+  proposals  Proposal[]
   activities Activity[]
-  createdAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
 }
 
 model Deal {
-  id        String     @id @default(cuid())
-  title     String
-  clientId  String
-  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  value     Int        @default(0)
-  stage     String     @default("prospecting") // prospecting | negotiation | won | lost
-  closeDate DateTime?
-  proposals Proposal[]
+  id         String     @id @default(cuid())
+  title      String
+  clientId   String
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  value      Int        @default(0)
+  stage      String     @default("prospecting") // prospecting | negotiation | won | lost
+  closeDate  DateTime?
+  proposals  Proposal[]
   activities Activity[]
-  createdAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
 }
 
 model Proposal {

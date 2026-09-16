@@ -216,35 +216,33 @@ export default function Header() {
                 fontWeight: 600,
               }}
             >
-              {user?.name || "Isha"}
+              {user?.name || "User"}
             </span>
 
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px",
+                background: "transparent",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                color: "rgba(0,55,58,0.45)",
+                marginLeft: "4px",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#FF6A3D")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(0,55,58,0.45)")}
+            >
+              <LogOut size={17} strokeWidth={2} />
+            </button>
           </div>
-
-
-          {/* ================= LOGOUT ================= */}
-
-          <button
-            type="button"
-            aria-label="Logout"
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "8px 12px",
-              border: "1px solid rgba(0,55,58,0.22)",
-              borderRadius: "10px",
-              background: "transparent",
-              color: "#00373A",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <LogOut size={16} strokeWidth={1.8} />
-            Logout
-          </button>
 
         </div>
       </div>
