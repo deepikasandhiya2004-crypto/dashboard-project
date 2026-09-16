@@ -14,45 +14,66 @@ app.use(express.json());
 // ---- Auth ----
 
 app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name?.trim() || !email?.trim() || !password || password.length < 6) {
-    return res.status(400).json({
-      error: "Name, email, and a password of at least 6 characters are required.",
+  try {
+    const { name, email, password } = req.body;
+    if (!name?.trim() || !email?.trim() || !password || password.length < 6) {
+      return res.status(400).json({
+        error: "Name, email, and a password of at least 6 characters are required.",
+      });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({ data: { name, email, password: hashed } });
+
+    const token = signToken(user);
+    res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email } });
+  } catch (err) {
+    console.error("Register error:", err.message);
+    res.status(500).json({
+      error: "Unable to connect to the database. Please verify your DATABASE_URL in server/.env.",
     });
   }
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return res.status(409).json({ error: "An account with this email already exists." });
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({ data: { name, email, password: hashed } });
-
-  const token = signToken(user);
-  res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email } });
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required." });
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(401).json({ error: "Invalid email or password." });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: "Invalid email or password." });
+
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+  } catch (err) {
+    console.error("Login error:", err.message);
+    res.status(500).json({
+      error: "Unable to connect to the database. Please verify your DATABASE_URL in server/.env.",
+    });
   }
-
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return res.status(401).json({ error: "Invalid email or password." });
-
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ error: "Invalid email or password." });
-
-  const token = signToken(user);
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
 });
 
 app.get("/api/auth/me", requireAuth, async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-  if (!user) return res.status(404).json({ error: "User not found." });
-  res.json({ id: user.id, name: user.name, email: user.email });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (!user) return res.status(404).json({ error: "User not found." });
+    res.json({ id: user.id, name: user.name, email: user.email });
+  } catch (err) {
+    console.error("Me error:", err.message);
+    res.status(500).json({
+      error: "Unable to connect to the database. Please verify your DATABASE_URL in server/.env.",
+    });
+  }
 });
 
 // =========================================================
