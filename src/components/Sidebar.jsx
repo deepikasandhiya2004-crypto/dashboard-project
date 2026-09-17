@@ -72,10 +72,10 @@ export default function Sidebar() {
       style={{ backgroundColor: "#00373A" }}
     >
       <div className="px-2 text-xl" style={{ fontWeight: 800 }}>
-        Flowline
+        INFINIQ CRM
       </div>
 
-      <nav className="mt-8 flex flex-1 flex-col gap-1">
+        <nav className="mt-8 flex flex-1 flex-col gap-1 overflow-y-auto min-h-0 scrollbar-hide">
         {links.map(({ to, label, icon: Icon, children }) => {
           // Normal links
           if (!children) {

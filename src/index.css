@@ -50,3 +50,12 @@ body {
   color: #00373a;
   font-family: "Gellix", system-ui, sans-serif;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  
+  scrollbar-width: none;     
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;            
+}

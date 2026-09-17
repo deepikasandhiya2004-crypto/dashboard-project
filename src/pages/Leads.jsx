@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable.jsx";
+import ActivityLog from "../components/ActivityLog.jsx";
 import { api } from "../lib/api.js";
 
 const statuses = ["new", "contacted", "qualified", "proposal", "won", "lost"];
@@ -10,6 +11,7 @@ export default function Leads() {
   const [email, setEmail] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
 
   function load() {
     api.getLeads().then(setLeads).catch((e) => setError(e.message));
@@ -47,6 +49,7 @@ export default function Leads() {
     try {
       await api.deleteLead(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
+      if (expandedId === id) setExpandedId(null);
     } catch (e) {
       setError(e.message);
     }
@@ -94,7 +97,18 @@ export default function Leads() {
       <div className="mt-6">
         <DataTable
           columns={[
-            { key: "name", label: "Name" },
+            {
+              key: "name",
+              label: "Name",
+              render: (r) => (
+                <button
+                  onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                  className="font-semibold text-dark underline decoration-dotted"
+                >
+                  {r.name}
+                </button>
+              ),
+            },
             { key: "email", label: "Email", render: (r) => r.email || "—" },
             { key: "source", label: "Source", render: (r) => r.source || "—" },
             {
@@ -128,6 +142,15 @@ export default function Leads() {
           rows={leads}
         />
       </div>
+
+      {expandedId && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs text-dark/50">
+            Activity for: {leads.find((l) => l.id === expandedId)?.name}
+          </p>
+          <ActivityLog leadId={expandedId} />
+        </div>
+      )}
     </div>
   );
 }
