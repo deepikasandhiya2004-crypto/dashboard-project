@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Pencil, FileText } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  FileText,
+  Receipt,
+  CreditCard,
+  ArrowLeftRight,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 
 export default function Finance() {
+  const navigate = useNavigate();
+
   const [clients, setClients] = useState([]);
   const [quotations, setQuotations] = useState([]);
 
@@ -145,10 +156,7 @@ export default function Finance() {
   const discount = Number(form.discount) || 0;
   const tax = Number(form.tax) || 0;
 
-  const total = Math.max(
-    0,
-    subtotal - discount + tax
-  );
+  const total = Math.max(0, subtotal - discount + tax);
 
   // --------------------------------------------------
   // Create / Update quotation
@@ -294,6 +302,37 @@ export default function Finance() {
       0
     );
 
+  // --------------------------------------------------
+  // Finance navigation cards
+  // --------------------------------------------------
+
+  const financeCards = [
+    {
+      title: "Quotations",
+      description: "Create and manage client quotations",
+      icon: FileText,
+      path: "/finance",
+    },
+    {
+      title: "Invoices",
+      description: "Create and manage client invoices",
+      icon: Receipt,
+      path: "/finance/invoices",
+    },
+    {
+      title: "Payments",
+      description: "Track payments received from clients",
+      icon: CreditCard,
+      path: "/finance/payments",
+    },
+    {
+      title: "Transactions",
+      description: "View and manage financial transactions",
+      icon: ArrowLeftRight,
+      path: "/finance/transactions",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -322,6 +361,38 @@ export default function Finance() {
           <Plus size={18} />
           New Quotation
         </button>
+      </div>
+
+      {/* Finance navigation cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {financeCards.map(
+          ({ title, description, icon: Icon, path }) => (
+            <button
+              key={path}
+              type="button"
+              onClick={() => navigate(path)}
+              className="group rounded-2xl border border-dark/10 bg-white p-5 text-left transition-all hover:-translate-y-0.5 hover:border-dark/20 hover:shadow-sm"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-dark/5 text-dark transition group-hover:bg-dark group-hover:text-white">
+                  <Icon size={21} />
+                </div>
+
+                <span className="text-lg text-dark/30 transition group-hover:text-dark">
+                  →
+                </span>
+              </div>
+
+              <h2 className="mt-4 text-base font-bold text-dark">
+                {title}
+              </h2>
+
+              <p className="mt-1 text-sm leading-5 text-dark/50">
+                {description}
+              </p>
+            </button>
+          )
+        )}
       </div>
 
       {/* Error */}

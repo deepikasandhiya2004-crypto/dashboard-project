@@ -2832,6 +2832,2107 @@ app.delete("/api/support-tickets/:id", async (req, res) => {
   }
 });
 // =========================================================
+// MODULE 15 — REPORTS
+// =========================================================
+
+app.use("/api/reports", requireAuth);
+
+// GET REPORTS
+app.get("/api/reports", async (req, res) => {
+  try {
+    const [
+      leads,
+      deals,
+      projects,
+      invoices,
+      payments,
+      supportTickets,
+    ] = await Promise.all([
+      prisma.lead.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.deal.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.project.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.invoice.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.payment.findMany({
+        orderBy: {
+          paymentDate: "desc",
+        },
+      }),
+
+      prisma.supportTicket.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+    ]);
+
+    // =====================================================
+    // LEADS REPORT
+    // =====================================================
+
+    const leadsReport = {
+      total: leads.length,
+
+      new: leads.filter(
+        (lead) => lead.status === "new"
+      ).length,
+
+      contacted: leads.filter(
+        (lead) => lead.status === "contacted"
+      ).length,
+
+      qualified: leads.filter(
+        (lead) => lead.status === "qualified"
+      ).length,
+
+      converted: leads.filter(
+        (lead) => lead.status === "converted"
+      ).length,
+
+      lost: leads.filter(
+        (lead) => lead.status === "lost"
+      ).length,
+    };
+
+    // =====================================================
+    // SALES REPORT
+    // =====================================================
+
+    const totalSales = deals.reduce(
+      (sum, deal) =>
+        sum + Number(deal.value || 0),
+      0
+    );
+
+    const wonDeals = deals.filter(
+      (deal) =>
+        String(deal.stage || "").toLowerCase() === "won"
+    );
+
+    const wonSales = wonDeals.reduce(
+      (sum, deal) =>
+        sum + Number(deal.value || 0),
+      0
+    );
+
+    const salesReport = {
+      totalDeals: deals.length,
+      wonDeals: wonDeals.length,
+      totalSales,
+      wonSales,
+    };
+
+    // =====================================================
+    // PROJECT REPORT
+    // =====================================================
+
+    const projectsReport = {
+      total: projects.length,
+
+      planning: projects.filter(
+        (project) => project.status === "planning"
+      ).length,
+
+      active: projects.filter(
+        (project) =>
+          project.status === "active" ||
+          project.status === "in_progress"
+      ).length,
+
+      completed: projects.filter(
+        (project) =>
+          project.status === "completed"
+      ).length,
+
+      onHold: projects.filter(
+        (project) =>
+          project.status === "on_hold"
+      ).length,
+    };
+
+    // =====================================================
+    // REVENUE REPORT
+    // =====================================================
+
+    const totalInvoiced = invoices.reduce(
+      (sum, invoice) =>
+        sum + Number(invoice.total || 0),
+      0
+    );
+
+    const totalReceived = payments.reduce(
+      (sum, payment) =>
+        sum + Number(payment.amount || 0),
+      0
+    );
+
+    const totalPending = invoices.reduce(
+      (sum, invoice) =>
+        sum + Number(invoice.balanceAmount || 0),
+      0
+    );
+
+    const revenueReport = {
+      totalInvoiced,
+      totalReceived,
+      totalPending,
+    };
+
+    // =====================================================
+    // SUPPORT REPORT
+    // =====================================================
+
+    const supportReport = {
+      total: supportTickets.length,
+
+      open: supportTickets.filter(
+        (ticket) => ticket.status === "open"
+      ).length,
+
+      inProgress: supportTickets.filter(
+        (ticket) =>
+          ticket.status === "in_progress"
+      ).length,
+
+      resolved: supportTickets.filter(
+        (ticket) =>
+          ticket.status === "resolved"
+      ).length,
+
+      closed: supportTickets.filter(
+        (ticket) =>
+          ticket.status === "closed"
+      ).length,
+    };
+
+    // =====================================================
+    // MONTHLY REVENUE
+    // =====================================================
+
+    const monthlyRevenue = [];
+
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(
+        now.getFullYear(),
+        now.getMonth() - i,
+        1
+      );
+
+      const nextMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() - i + 1,
+        1
+      );
+
+      const monthPayments = payments.filter(
+        (payment) => {
+          const paymentDate = new Date(
+            payment.paymentDate
+          );
+
+          return (
+            paymentDate >= monthDate &&
+            paymentDate < nextMonth
+          );
+        }
+      );
+
+      const amount = monthPayments.reduce(
+        (sum, payment) =>
+          sum + Number(payment.amount || 0),
+        0
+      );
+
+      monthlyRevenue.push({
+        month: monthDate.toLocaleString("en-IN", {
+          month: "short",
+        }),
+        revenue: amount,
+      });
+    }
+
+    // =====================================================
+    // FINAL RESPONSE
+    // =====================================================
+
+    res.json({
+      sales: salesReport,
+      leads: leadsReport,
+      projects: projectsReport,
+      revenue: revenueReport,
+      support: supportReport,
+      monthlyRevenue,
+    });
+
+  } catch (err) {
+    console.error("Reports error:", err);
+
+    res.status(500).json({
+      error:
+        err.message ||
+        "Failed to generate reports.",
+    });
+  }
+});
+// =========================================================
+// MODULE 15 — SETTINGS / USER PROFILE
+// =========================================================
+
+app.patch("/api/users/me", requireAuth, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Name is required.",
+      });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({
+        error: "Email is required.",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        email: email.trim(),
+      },
+    });
+
+    if (
+      existingUser &&
+      existingUser.id !== req.user.userId
+    ) {
+      return res.status(409).json({
+        error: "An account with this email already exists.",
+      });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: req.user.userId,
+      },
+      data: {
+        name: name.trim(),
+        email: email.trim(),
+      },
+    });
+
+    res.json({
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update profile.",
+    });
+  }
+});
+// =========================================================
+// MODULE 16 — SETTINGS / ROLES
+// =========================================================
+
+app.use("/api/roles", requireAuth);
+
+// GET all roles
+app.get("/api/roles", async (req, res) => {
+  try {
+    const roles = await prisma.role.findMany({
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
+        },
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(roles);
+  } catch (err) {
+    console.error("Get roles error:", err);
+    res.status(500).json({
+      error: err.message || "Failed to load roles.",
+    });
+  }
+});
+
+// GET single role
+app.get("/api/roles/:id", async (req, res) => {
+  try {
+    const role = await prisma.role.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
+        },
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+    });
+
+    if (!role) {
+      return res.status(404).json({
+        error: "Role not found.",
+      });
+    }
+
+    res.json(role);
+  } catch (err) {
+    console.error("Get role error:", err);
+    res.status(500).json({
+      error: err.message || "Failed to load role.",
+    });
+  }
+});
+
+// CREATE role
+app.post("/api/roles", async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Role name is required.",
+      });
+    }
+
+    const existingRole = await prisma.role.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (existingRole) {
+      return res.status(409).json({
+        error: "A role with this name already exists.",
+      });
+    }
+
+    const role = await prisma.role.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+      },
+    });
+
+    res.status(201).json(role);
+  } catch (err) {
+    console.error("Create role error:", err);
+    res.status(500).json({
+      error: err.message || "Failed to create role.",
+    });
+  }
+});
+
+// UPDATE role
+app.patch("/api/roles/:id", async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Role name is required.",
+      });
+    }
+
+    const existingRole = await prisma.role.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (
+      existingRole &&
+      existingRole.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "A role with this name already exists.",
+      });
+    }
+
+    const role = await prisma.role.update({
+      where: {
+        id: req.params.id,
+      },
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+      },
+    });
+
+    res.json(role);
+  } catch (err) {
+    console.error("Update role error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Role not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update role.",
+    });
+  }
+});
+
+// DELETE role
+app.delete("/api/roles/:id", async (req, res) => {
+  try {
+    const role = await prisma.role.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+    });
+
+    if (!role) {
+      return res.status(404).json({
+        error: "Role not found.",
+      });
+    }
+
+    if (role._count.users > 0) {
+      return res.status(400).json({
+        error: "Cannot delete a role assigned to users.",
+      });
+    }
+
+    await prisma.role.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Role deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete role error:", err);
+    res.status(500).json({
+      error: err.message || "Failed to delete role.",
+    });
+  }
+});
+// =========================================================
+// MODULE 17 — SETTINGS / PERMISSIONS
+// =========================================================
+
+app.use("/api/permissions", requireAuth);
+
+// GET all permissions
+app.get("/api/permissions", async (req, res) => {
+  try {
+    const permissions = await prisma.permission.findMany({
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            roles: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(permissions);
+  } catch (err) {
+    console.error("Get permissions error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load permissions.",
+    });
+  }
+});
+
+// GET single permission
+app.get("/api/permissions/:id", async (req, res) => {
+  try {
+    const permission = await prisma.permission.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            roles: true,
+          },
+        },
+      },
+    });
+
+    if (!permission) {
+      return res.status(404).json({
+        error: "Permission not found.",
+      });
+    }
+
+    res.json(permission);
+  } catch (err) {
+    console.error("Get permission error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load permission.",
+    });
+  }
+});
+
+// CREATE permission
+app.post("/api/permissions", async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Permission name is required.",
+      });
+    }
+
+    const existingPermission =
+      await prisma.permission.findUnique({
+        where: {
+          name: name.trim(),
+        },
+      });
+
+    if (existingPermission) {
+      return res.status(409).json({
+        error: "A permission with this name already exists.",
+      });
+    }
+
+    const permission = await prisma.permission.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+      },
+    });
+
+    res.status(201).json(permission);
+  } catch (err) {
+    console.error("Create permission error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create permission.",
+    });
+  }
+});
+
+// UPDATE permission
+app.patch("/api/permissions/:id", async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Permission name is required.",
+      });
+    }
+
+    const existingPermission =
+      await prisma.permission.findUnique({
+        where: {
+          name: name.trim(),
+        },
+      });
+
+    if (
+      existingPermission &&
+      existingPermission.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "A permission with this name already exists.",
+      });
+    }
+
+    const permission = await prisma.permission.update({
+      where: {
+        id: req.params.id,
+      },
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+      },
+    });
+
+    res.json(permission);
+  } catch (err) {
+    console.error("Update permission error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Permission not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update permission.",
+    });
+  }
+});
+
+// DELETE permission
+app.delete("/api/permissions/:id", async (req, res) => {
+  try {
+    const permission = await prisma.permission.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        _count: {
+          select: {
+            roles: true,
+          },
+        },
+      },
+    });
+
+    if (!permission) {
+      return res.status(404).json({
+        error: "Permission not found.",
+      });
+    }
+
+    if (permission._count.roles > 0) {
+      return res.status(400).json({
+        error: "Cannot delete a permission assigned to roles.",
+      });
+    }
+
+    await prisma.permission.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Permission deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete permission error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete permission.",
+    });
+  }
+});
+// =========================================================
+// MODULE 18 — SETTINGS / USERS
+// =========================================================
+
+app.use("/api/users", requireAuth);
+
+// GET ALL USERS
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roleId: true,
+        departmentId: true,
+        createdAt: true,
+        roleRef: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(users);
+  } catch (err) {
+    console.error("Get users error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load users.",
+    });
+  }
+});
+
+
+// GET SINGLE USER
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roleId: true,
+        departmentId: true,
+        createdAt: true,
+        roleRef: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error("Get user error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load user.",
+    });
+  }
+});
+
+
+// CREATE USER
+app.post("/api/users", async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      roleId,
+      departmentId,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Name is required.",
+      });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({
+        error: "Email is required.",
+      });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        error: "Password must be at least 6 characters.",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        email: email.trim().toLowerCase(),
+      },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        error: "An account with this email already exists.",
+      });
+    }
+
+    // Validate role if provided
+    if (roleId) {
+      const role = await prisma.role.findUnique({
+        where: {
+          id: roleId,
+        },
+      });
+
+      if (!role) {
+        return res.status(400).json({
+          error: "Selected role does not exist.",
+        });
+      }
+    }
+
+    // Validate department if provided
+    if (departmentId) {
+      const department = await prisma.department.findUnique({
+        where: {
+          id: departmentId,
+        },
+      });
+
+      if (!department) {
+        return res.status(400).json({
+          error: "Selected department does not exist.",
+        });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: hashedPassword,
+
+        // Keep existing legacy role field in sync
+        role: "member",
+
+        ...(roleId && {
+          roleId,
+        }),
+
+        ...(departmentId && {
+          departmentId,
+        }),
+      },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roleId: true,
+        departmentId: true,
+        createdAt: true,
+        roleRef: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(user);
+  } catch (err) {
+    console.error("Create user error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create user.",
+    });
+  }
+});
+
+
+// UPDATE USER
+app.patch("/api/users/:id", async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      roleId,
+      departmentId,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Name is required.",
+      });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({
+        error: "Email is required.",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    const emailOwner = await prisma.user.findUnique({
+      where: {
+        email: email.trim().toLowerCase(),
+      },
+    });
+
+    if (
+      emailOwner &&
+      emailOwner.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "An account with this email already exists.",
+      });
+    }
+
+    // Validate role
+    if (roleId) {
+      const role = await prisma.role.findUnique({
+        where: {
+          id: roleId,
+        },
+      });
+
+      if (!role) {
+        return res.status(400).json({
+          error: "Selected role does not exist.",
+        });
+      }
+    }
+
+    // Validate department
+    if (departmentId) {
+      const department = await prisma.department.findUnique({
+        where: {
+          id: departmentId,
+        },
+      });
+
+      if (!department) {
+        return res.status(400).json({
+          error: "Selected department does not exist.",
+        });
+      }
+    }
+
+    const updateData = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      roleId: roleId || null,
+      departmentId: departmentId || null,
+    };
+
+    // Password only changes when entered
+    if (password && password.trim()) {
+      if (password.length < 6) {
+        return res.status(400).json({
+          error: "Password must be at least 6 characters.",
+        });
+      }
+
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: req.params.id,
+      },
+      data: updateData,
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roleId: true,
+        departmentId: true,
+        createdAt: true,
+        roleRef: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error("Update user error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update user.",
+    });
+  }
+});
+
+
+// DELETE USER
+app.delete("/api/users/:id", async (req, res) => {
+  try {
+    if (req.params.id === req.user.userId) {
+      return res.status(400).json({
+        error: "You cannot delete your own account.",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    await prisma.user.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "User deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete user error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete user.",
+    });
+  }
+});
+// =========================================================
+// MODULE 19 — SETTINGS / DEPARTMENTS
+// =========================================================
+
+app.use("/api/departments", requireAuth);
+
+// GET all departments
+app.get("/api/departments", async (req, res) => {
+  try {
+    const departments = await prisma.department.findMany({
+      include: {
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(departments);
+  } catch (err) {
+    console.error("Get departments error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load departments.",
+    });
+  }
+});
+
+// GET single department
+app.get("/api/departments/:id", async (req, res) => {
+  try {
+    const department = await prisma.department.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+    });
+
+    if (!department) {
+      return res.status(404).json({
+        error: "Department not found.",
+      });
+    }
+
+    res.json(department);
+  } catch (err) {
+    console.error("Get department error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load department.",
+    });
+  }
+});
+
+// CREATE department
+app.post("/api/departments", async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Department name is required.",
+      });
+    }
+
+    const existingDepartment = await prisma.department.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (existingDepartment) {
+      return res.status(409).json({
+        error: "A department with this name already exists.",
+      });
+    }
+
+    const department = await prisma.department.create({
+      data: {
+        name: name.trim(),
+      },
+    });
+
+    res.status(201).json(department);
+  } catch (err) {
+    console.error("Create department error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create department.",
+    });
+  }
+});
+
+// UPDATE department
+app.patch("/api/departments/:id", async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Department name is required.",
+      });
+    }
+
+    const existingDepartment = await prisma.department.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (
+      existingDepartment &&
+      existingDepartment.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "A department with this name already exists.",
+      });
+    }
+
+    const department = await prisma.department.update({
+      where: {
+        id: req.params.id,
+      },
+      data: {
+        name: name.trim(),
+      },
+    });
+
+    res.json(department);
+  } catch (err) {
+    console.error("Update department error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Department not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update department.",
+    });
+  }
+});
+
+// DELETE department
+app.delete("/api/departments/:id", async (req, res) => {
+  try {
+    const department = await prisma.department.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+    });
+
+    if (!department) {
+      return res.status(404).json({
+        error: "Department not found.",
+      });
+    }
+
+    if (department._count.users > 0) {
+      return res.status(400).json({
+        error: "Cannot delete a department assigned to users.",
+      });
+    }
+
+    await prisma.department.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Department deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete department error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete department.",
+    });
+  }
+});
+// =========================================================
+// MODULE 20 — SETTINGS / SERVICES
+// =========================================================
+
+app.use("/api/services", requireAuth);
+
+// GET all services
+app.get("/api/services", async (req, res) => {
+  try {
+    const services = await prisma.service.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(services);
+  } catch (err) {
+    console.error("Get services error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load services.",
+    });
+  }
+});
+
+// GET single service
+app.get("/api/services/:id", async (req, res) => {
+  try {
+    const service = await prisma.service.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!service) {
+      return res.status(404).json({
+        error: "Service not found.",
+      });
+    }
+
+    res.json(service);
+  } catch (err) {
+    console.error("Get service error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load service.",
+    });
+  }
+});
+
+// CREATE service
+app.post("/api/services", async (req, res) => {
+  try {
+    const { name, description, category, price } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Service name is required.",
+      });
+    }
+
+    const existingService = await prisma.service.findFirst({
+      where: {
+        name: {
+          equals: name.trim(),
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existingService) {
+      return res.status(409).json({
+        error: "A service with this name already exists.",
+      });
+    }
+
+    const service = await prisma.service.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+        category: category?.trim() || "general",
+        price:
+          price === "" || price === undefined || price === null
+            ? 0
+            : Number(price),
+      },
+    });
+
+    res.status(201).json(service);
+  } catch (err) {
+    console.error("Create service error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create service.",
+    });
+  }
+});
+
+// UPDATE service
+app.patch("/api/services/:id", async (req, res) => {
+  try {
+    const { name, description, category, price } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Service name is required.",
+      });
+    }
+
+    const existingService = await prisma.service.findFirst({
+      where: {
+        name: {
+          equals: name.trim(),
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (
+      existingService &&
+      existingService.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "A service with this name already exists.",
+      });
+    }
+
+    const service = await prisma.service.update({
+      where: {
+        id: req.params.id,
+      },
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+        category: category?.trim() || "general",
+        price:
+          price === "" || price === undefined || price === null
+            ? 0
+            : Number(price),
+      },
+    });
+
+    res.json(service);
+  } catch (err) {
+    console.error("Update service error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Service not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update service.",
+    });
+  }
+});
+
+// DELETE service
+app.delete("/api/services/:id", async (req, res) => {
+  try {
+    const service = await prisma.service.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!service) {
+      return res.status(404).json({
+        error: "Service not found.",
+      });
+    }
+
+    await prisma.service.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Service deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete service error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to delete service.",
+    });
+  }
+});
+// =========================================================
+// MODULE 19 — SETTINGS / NOTIFICATIONS
+// =========================================================
+
+app.use("/api/notification-settings", requireAuth);
+
+// GET current user's notification settings
+app.get("/api/notification-settings", async (req, res) => {
+  try {
+    let settings = await prisma.notificationSetting.findUnique({
+      where: {
+        userId: req.user.userId,
+      },
+    });
+
+    // Create default settings if they don't exist
+    if (!settings) {
+      settings = await prisma.notificationSetting.create({
+        data: {
+          userId: req.user.userId,
+        },
+      });
+    }
+
+    res.json(settings);
+  } catch (err) {
+    console.error("Get notification settings error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load notification settings.",
+    });
+  }
+});
+
+// UPDATE current user's notification settings
+app.patch("/api/notification-settings", async (req, res) => {
+  try {
+    const {
+      emailNotifications,
+      taskNotifications,
+      leadNotifications,
+      projectNotifications,
+      paymentNotifications,
+      supportNotifications,
+    } = req.body;
+
+    const settings = await prisma.notificationSetting.upsert({
+      where: {
+        userId: req.user.userId,
+      },
+
+      update: {
+        emailNotifications:
+          Boolean(emailNotifications),
+
+        taskNotifications:
+          Boolean(taskNotifications),
+
+        leadNotifications:
+          Boolean(leadNotifications),
+
+        projectNotifications:
+          Boolean(projectNotifications),
+
+        paymentNotifications:
+          Boolean(paymentNotifications),
+
+        supportNotifications:
+          Boolean(supportNotifications),
+      },
+
+      create: {
+        userId: req.user.userId,
+
+        emailNotifications:
+          emailNotifications !== undefined
+            ? Boolean(emailNotifications)
+            : true,
+
+        taskNotifications:
+          taskNotifications !== undefined
+            ? Boolean(taskNotifications)
+            : true,
+
+        leadNotifications:
+          leadNotifications !== undefined
+            ? Boolean(leadNotifications)
+            : true,
+
+        projectNotifications:
+          projectNotifications !== undefined
+            ? Boolean(projectNotifications)
+            : true,
+
+        paymentNotifications:
+          paymentNotifications !== undefined
+            ? Boolean(paymentNotifications)
+            : true,
+
+        supportNotifications:
+          supportNotifications !== undefined
+            ? Boolean(supportNotifications)
+            : true,
+      },
+    });
+
+    res.json(settings);
+  } catch (err) {
+    console.error("Update notification settings error:", err);
+
+    res.status(500).json({
+      error:
+        err.message ||
+        "Failed to update notification settings.",
+    });
+  }
+});
+// =========================================================
+// MODULE 20 — SETTINGS / INTEGRATIONS
+// =========================================================
+
+app.use("/api/integrations", requireAuth);
+
+// GET all integrations
+app.get("/api/integrations", async (req, res) => {
+  try {
+    const integrations = await prisma.integration.findMany({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    res.json(integrations);
+  } catch (err) {
+    console.error("Get integrations error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load integrations.",
+    });
+  }
+});
+
+// GET single integration
+app.get("/api/integrations/:id", async (req, res) => {
+  try {
+    const integration = await prisma.integration.findUnique({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (!integration) {
+      return res.status(404).json({
+        error: "Integration not found.",
+      });
+    }
+
+    res.json(integration);
+  } catch (err) {
+    console.error("Get integration error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load integration.",
+    });
+  }
+});
+
+// CREATE integration
+app.post("/api/integrations", async (req, res) => {
+  try {
+    const {
+      name,
+      provider,
+      description,
+      enabled,
+      configured,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Integration name is required.",
+      });
+    }
+
+    if (!provider?.trim()) {
+      return res.status(400).json({
+        error: "Provider is required.",
+      });
+    }
+
+    const existing = await prisma.integration.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        error: "An integration with this name already exists.",
+      });
+    }
+
+    const integration = await prisma.integration.create({
+      data: {
+        name: name.trim(),
+        provider: provider.trim(),
+        description: description?.trim() || null,
+        enabled: Boolean(enabled),
+        configured: Boolean(configured),
+      },
+    });
+
+    res.status(201).json(integration);
+  } catch (err) {
+    console.error("Create integration error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create integration.",
+    });
+  }
+});
+
+// UPDATE integration
+app.patch("/api/integrations/:id", async (req, res) => {
+  try {
+    const {
+      name,
+      provider,
+      description,
+      enabled,
+      configured,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: "Integration name is required.",
+      });
+    }
+
+    const existing = await prisma.integration.findUnique({
+      where: {
+        name: name.trim(),
+      },
+    });
+
+    if (
+      existing &&
+      existing.id !== req.params.id
+    ) {
+      return res.status(409).json({
+        error: "An integration with this name already exists.",
+      });
+    }
+
+    const integration =
+      await prisma.integration.update({
+        where: {
+          id: req.params.id,
+        },
+        data: {
+          name: name.trim(),
+          provider: provider.trim(),
+          description: description?.trim() || null,
+          enabled: Boolean(enabled),
+          configured: Boolean(configured),
+        },
+      });
+
+    res.json(integration);
+  } catch (err) {
+    console.error("Update integration error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Integration not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to update integration.",
+    });
+  }
+});
+
+// DELETE integration
+app.delete("/api/integrations/:id", async (req, res) => {
+  try {
+    await prisma.integration.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Integration deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete integration error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Integration not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to delete integration.",
+    });
+  }
+});
+// =========================================================
+// MODULE 21 — SETTINGS / SECURITY
+// =========================================================
+
+app.use("/api/security", requireAuth);
+
+app.patch("/api/security/password", async (req, res) => {
+  try {
+    const {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        error: "All password fields are required.",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        error: "New password and confirm password do not match.",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: "New password must be at least 8 characters.",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.user.userId,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!passwordMatch) {
+      return res.status(400).json({
+        error: "Current password is incorrect.",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      10
+    );
+
+    await prisma.user.update({
+      where: {
+        id: req.user.userId,
+      },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    res.json({
+      message: "Password updated successfully.",
+    });
+  } catch (err) {
+    console.error("Change password error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to update password.",
+    });
+  }
+});
+// =========================================================
+// MODULE 22 — SETTINGS / AUDIT LOGS
+// =========================================================
+
+app.use("/api/audit-logs", requireAuth);
+
+// GET all audit logs
+app.get("/api/audit-logs", async (req, res) => {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error("Get audit logs error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load audit logs.",
+    });
+  }
+});
+
+// GET single audit log
+app.get("/api/audit-logs/:id", async (req, res) => {
+  try {
+    const log = await prisma.auditLog.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!log) {
+      return res.status(404).json({
+        error: "Audit log not found.",
+      });
+    }
+
+    res.json(log);
+  } catch (err) {
+    console.error("Get audit log error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to load audit log.",
+    });
+  }
+});
+
+// CREATE audit log
+app.post("/api/audit-logs", async (req, res) => {
+  try {
+    const {
+      action,
+      module,
+      description,
+      ipAddress,
+    } = req.body;
+
+    if (!action?.trim()) {
+      return res.status(400).json({
+        error: "Action is required.",
+      });
+    }
+
+    if (!module?.trim()) {
+      return res.status(400).json({
+        error: "Module is required.",
+      });
+    }
+
+    const log = await prisma.auditLog.create({
+      data: {
+        userId: req.user.userId,
+        action: action.trim(),
+        module: module.trim(),
+        description: description?.trim() || null,
+        ipAddress: ipAddress?.trim() || null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(log);
+  } catch (err) {
+    console.error("Create audit log error:", err);
+
+    res.status(500).json({
+      error: err.message || "Failed to create audit log.",
+    });
+  }
+});
+
+// DELETE audit log
+app.delete("/api/audit-logs/:id", async (req, res) => {
+  try {
+    await prisma.auditLog.delete({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    res.json({
+      message: "Audit log deleted successfully.",
+    });
+  } catch (err) {
+    console.error("Delete audit log error:", err);
+
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        error: "Audit log not found.",
+      });
+    }
+
+    res.status(500).json({
+      error: err.message || "Failed to delete audit log.",
+    });
+  }
+});
+// =========================================================
+// AUDIT LOG HELPER
+// =========================================================
+
+async function createAuditLog({
+  userId,
+  action,
+  module,
+  description,
+  ipAddress,
+}) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: userId || null,
+        action,
+        module,
+        description: description || null,
+        ipAddress: ipAddress || null,
+      },
+    });
+  } catch (err) {
+    console.error("Audit log error:", err);
+  }
+}
+// =========================================================
 // SERVER START — KEEP THIS AT THE VERY END
 // =========================================================
 

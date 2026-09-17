@@ -216,4 +216,119 @@ updateSupportTicket: (id, data) =>
 
 deleteSupportTicket: (id) =>
   apiClient.delete(`/api/support-tickets/${id}`),
+updateMyProfile: (data) =>
+  apiClient.patch("/api/users/me", data),
+
+getRoles: () =>
+  apiClient.get("/api/roles"),
+
+getRole: (id) =>
+  apiClient.get(`/api/roles/${id}`),
+
+createRole: (data) =>
+  apiClient.post("/api/roles", data),
+
+updateRole: (id, data) =>
+  apiClient.patch(`/api/roles/${id}`, data),
+
+deleteRole: (id) =>
+  apiClient.delete(`/api/roles/${id}`),
+// =====================================================
+// REPORT APIs
+// =====================================================
+
+getReports: () =>
+  apiClient.get("/api/reports"),
+getPermissions: () =>
+  apiClient.get("/api/permissions"),
+
+getPermission: (id) =>
+  apiClient.get(`/api/permissions/${id}`),
+
+createPermission: (data) =>
+  apiClient.post("/api/permissions", data),
+
+updatePermission: (id, data) =>
+  apiClient.patch(`/api/permissions/${id}`, data),
+
+deletePermission: (id) =>
+  apiClient.delete(`/api/permissions/${id}`),
+// USERS
+getUsers: () =>
+  apiClient.get("/api/users"),
+
+getUser: (id) =>
+  apiClient.get(`/api/users/${id}`),
+
+createUser: (data) =>
+  apiClient.post("/api/users", data),
+
+updateUser: (id, data) =>
+  apiClient.patch(`/api/users/${id}`, data),
+
+deleteUser: (id) =>
+  apiClient.delete(`/api/users/${id}`),
+getDepartments: () =>
+  apiClient.get("/api/departments"),
+
+getDepartment: (id) =>
+  apiClient.get(`/api/departments/${id}`),
+
+createDepartment: (data) =>
+  apiClient.post("/api/departments", data),
+
+updateDepartment: (id, data) =>
+  apiClient.patch(`/api/departments/${id}`, data),
+
+deleteDepartment: (id) =>
+  apiClient.delete(`/api/departments/${id}`),
+getServices: () =>
+  apiClient.get("/api/services"),
+
+getService: (id) =>
+  apiClient.get(`/api/services/${id}`),
+
+createService: (data) =>
+  apiClient.post("/api/services", data),
+
+updateService: (id, data) =>
+  apiClient.patch(`/api/services/${id}`, data),
+
+deleteService: (id) =>
+  apiClient.delete(`/api/services/${id}`),
+getNotificationSettings: () =>
+  apiClient.get("/api/notification-settings"),
+
+updateNotificationSettings: (data) =>
+  apiClient.patch(
+    "/api/notification-settings",
+    data
+  ),
+  getIntegrations: () =>
+  apiClient.get("/api/integrations"),
+
+getIntegration: (id) =>
+  apiClient.get(`/api/integrations/${id}`),
+
+createIntegration: (data) =>
+  apiClient.post("/api/integrations", data),
+
+updateIntegration: (id, data) =>
+  apiClient.patch(`/api/integrations/${id}`, data),
+
+deleteIntegration: (id) =>
+  apiClient.delete(`/api/integrations/${id}`),
+updatePassword: (data) =>
+  apiClient.patch("/api/security/password", data),
+getAuditLogs: () =>
+  apiClient.get("/api/audit-logs"),
+
+getAuditLog: (id) =>
+  apiClient.get(`/api/audit-logs/${id}`),
+
+createAuditLog: (data) =>
+  apiClient.post("/api/audit-logs", data),
+
+deleteAuditLog: (id) =>
+  apiClient.delete(`/api/audit-logs/${id}`),
 };

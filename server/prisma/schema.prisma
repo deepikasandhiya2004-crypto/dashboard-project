@@ -13,12 +13,16 @@ model User {
   email            String          @unique
   password         String
   role             String          @default("member") // admin | member
+  roleId           String?
+  roleRef          Role?           @relation(fields: [roleId], references: [id], onDelete: SetNull)
   resetToken       String?         @unique
   resetTokenExpiry DateTime?
   departmentId     String?
   department       Department?     @relation(fields: [departmentId], references: [id])
   createdAt        DateTime        @default(now())
   projectMembers   ProjectMember[]
+  notificationSettings NotificationSetting?
+  auditLogs AuditLog[]
 }
 
 model Department {
@@ -27,12 +31,22 @@ model Department {
   users     User[]
   createdAt DateTime @default(now())
 }
+model Service {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  category    String   @default("general")
+  price       Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 model Role {
   id          String           @id @default(cuid())
   name        String           @unique
   description String?
   permissions RolePermission[]
+  users       User[]
   createdAt   DateTime         @default(now())
 }
 
@@ -215,19 +229,19 @@ model Lead {
 }
 
 model Client {
-  id           String        @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  company      String?
-  deals        Deal[]
-  proposals    Proposal[]
-  activities   Activity[]
-  quotations   Quotation[]
-  invoices     Invoice[]
-  payments     Payment[]
-  transactions Transaction[]
-  createdAt    DateTime      @default(now())
+  id             String          @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  company        String?
+  deals          Deal[]
+  proposals      Proposal[]
+  activities     Activity[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+  payments       Payment[]
+  transactions   Transaction[]
+  createdAt      DateTime        @default(now())
   supportTickets SupportTicket[]
 }
 
@@ -367,23 +381,56 @@ model Transaction {
   reference       String?
   createdAt       DateTime @default(now())
 }
-// =====================================================
-// SUPPORT TICKETS
-// =====================================================
 
 model SupportTicket {
-  id          String   @id @default(cuid())
-  ticketNo    String   @unique
-  clientId    String?
-  client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  id       String  @id @default(cuid())
+  ticketNo String  @unique
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   subject     String
   description String?
-  status      String   @default("open")
-  priority    String   @default("medium")
-  category    String   @default("general")
+  status      String  @default("open")
+  priority    String  @default("medium")
+  category    String  @default("general")
   assignedTo  String?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model NotificationSetting {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailNotifications    Boolean  @default(true)
+  taskNotifications     Boolean  @default(true)
+  leadNotifications     Boolean  @default(true)
+  projectNotifications  Boolean  @default(true)
+  paymentNotifications  Boolean  @default(true)
+  supportNotifications  Boolean  @default(true)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+model Integration {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  provider    String
+  description String?
+  enabled     Boolean  @default(false)
+  configured  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  module      String
+  description String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

@@ -21,8 +21,16 @@ import Proposals from "./pages/Proposals.jsx";
 import Invoice from "./pages/invoice.jsx";
 import Payments from "./pages/payments.jsx";
 import Transactions from "./pages/transactions.jsx";
-
-
+import Roles from "./pages/roles.jsx";
+import Permissions from "./pages/permissions.jsx";
+import Users from "./pages/users.jsx";
+import Departments from "./pages/departments.jsx";
+import ServicesSettings from "./pages/services.jsx";
+import Pipeline from "./pages/Pipeline.jsx";
+import Notifications from "./pages/notifications.jsx";
+import Integrations from "./pages/Integrations.jsx";
+import Security from "./pages/Security.jsx";
+import AuditLogs from "./pages/AuditLogs.jsx";
 
 export default function App() {
   return (
@@ -61,6 +69,47 @@ export default function App() {
         <Route path="/support" element={<Support />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
+        <Route
+  path="/settings/permissions"
+  element={<Permissions />}
+/>
+<Route
+  path="/settings/users"
+  element={<Users />}
+  
+/>
+<Route
+  path="/settings/departments"
+  element={<Departments />}
+/>
+<Route
+  path="/settings/services"
+  element={<ServicesSettings />}
+  
+/>
+<Route
+  path="/settings/pipeline"
+  element={<Pipeline />}
+/>
+<Route
+  path="/settings/notifications"
+  element={<Notifications />}
+  
+/>
+<Route
+  path="/settings/integrations"
+  element={<Integrations />}
+
+/>
+<Route
+  path="/settings/security"
+  element={<Security />}
+/>
+<Route
+  path="/settings/audit-logs"
+  element={<AuditLogs />}
+/>
+        <Route path="/settings/roles" element={<Roles />} />
       </Route>
     </Routes>
   );
