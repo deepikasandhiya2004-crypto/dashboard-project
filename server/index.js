@@ -1364,26 +1364,6 @@ app.get("/api/calendar/events", async (req, res) => {
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ ok: true }));
-app.get("/api/quotations", async (req, res) => {
-  try {
-    const quotations = await prisma.quotation.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        client: true,
-        items: true,
-        invoice: true,
-      },
-    });
-
-    res.json(quotations);
-  } catch (err) {
-    console.error("Get quotations error:", err);
-
-    res.status(500).json({
-      error: err.message || "Failed to load quotations.",
-    });
-  }
-});
 
 
 
